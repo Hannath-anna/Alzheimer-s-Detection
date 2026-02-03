@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 5
-**Last update:** 2026-02-03 09:20:00
+**Total commits:** 6
+**Last update:** 2026-02-03 16:00:00
 
 ## Latest change
-Add image augmentation functions
+Create train/val/test split logic
 
