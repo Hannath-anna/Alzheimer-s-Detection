@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 6
-**Last update:** 2026-02-03 16:00:00
+**Total commits:** 7
+**Last update:** 2026-02-04 10:30:00
 
 ## Latest change
-Create train/val/test split logic
+Add data normalization and standardization
 
