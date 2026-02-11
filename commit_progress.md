@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 17
-**Last update:** 2026-02-11 10:00:00
+**Total commits:** 18
+**Last update:** 2026-02-11 14:30:00
 
 ## Latest change
-Fix data leakage in preprocessing pipeline
+Add class balancing with oversampling
 
