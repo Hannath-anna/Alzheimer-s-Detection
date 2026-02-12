@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 18
-**Last update:** 2026-02-11 14:30:00
+**Total commits:** 19
+**Last update:** 2026-02-12 09:15:00
 
 ## Latest change
-Add class balancing with oversampling
+Implement ResNet50 transfer learning model
 
