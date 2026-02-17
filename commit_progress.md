@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 24
-**Last update:** 2026-02-14 14:00:00
+**Total commits:** 25
+**Last update:** 2026-02-17 10:00:00
 
 ## Latest change
-Add requirements.txt and dependency pinning
+Refactor dataset loader for memory efficiency
 
