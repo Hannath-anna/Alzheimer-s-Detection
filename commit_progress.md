@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 26
-**Last update:** 2026-02-17 15:30:00
+**Total commits:** 27
+**Last update:** 2026-02-18 09:30:00
 
 ## Latest change
-Add ROC-AUC curve plotting
+Improve CNN model with attention mechanism
 
