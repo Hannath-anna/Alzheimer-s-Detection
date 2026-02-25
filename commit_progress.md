@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 36
-**Last update:** 2026-02-24 14:00:00
+**Total commits:** 37
+**Last update:** 2026-02-25 10:00:00
 
 ## Latest change
-Add training loss and accuracy plots
+Fix batch size memory issue during training
 
