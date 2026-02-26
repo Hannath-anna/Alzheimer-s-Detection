@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 38
-**Last update:** 2026-02-25 15:30:00
+**Total commits:** 39
+**Last update:** 2026-02-26 09:45:00
 
 ## Latest change
-Update README with dataset instructions
+Add feature extraction from penultimate layer
 
