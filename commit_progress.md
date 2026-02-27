@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 40
-**Last update:** 2026-02-26 14:30:00
+**Total commits:** 41
+**Last update:** 2026-02-27 10:00:00
 
 ## Latest change
-Implement t-SNE visualization of embeddings
+Add SVM classifier on top of CNN features
 
