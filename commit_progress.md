@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 46
-**Last update:** 2026-03-03 15:30:00
+**Total commits:** 47
+**Last update:** 2026-03-04 09:15:00
 
 ## Latest change
-Fix Lambda layer output shape inference bug
+Improve Flask response with confidence scores
 
