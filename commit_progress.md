@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 81
-**Last update:** 2026-03-31 09:30:00
+**Total commits:** 82
+**Last update:** 2026-03-31 14:00:00
 
 ## Latest change
-Add final model evaluation on held-out test set
+Export trained model to ONNX format
 
