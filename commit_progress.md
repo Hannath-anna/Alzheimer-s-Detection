@@ -1,8 +1,8 @@
 # Alzheimer Detection - Progress Log
 
-**Total commits:** 95
-**Last update:** 2026-04-09 10:15:00
+**Total commits:** 96
+**Last update:** 2026-04-09 15:30:00
 
 ## Latest change
-Final cleanup and code formatting pass
+Add project demo screenshots to README
 
