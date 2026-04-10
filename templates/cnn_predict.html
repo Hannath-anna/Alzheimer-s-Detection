@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}MRI Scan Analysis{% endblock %}
+{% block extra_css %}
+<style>
+  #preview-wrap { display:none; }
+  .class-row { display:flex; align-items:center; gap:12px; padding:0.75rem 0; border-bottom:1px solid var(--border); }
+  .class-row:last-child { border-bottom:none; }
+  .class-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .gradcam-swatch { width:32px; height:12px; border-radius:4px; flex-shrink:0; }
+  .upload-zone { position:relative; overflow:hidden; }
+  .upload-zone .upload-anim { position:absolute; inset:0; pointer-events:none; }
+  /* Spinning ring on hover */
+  @keyframes spin-ring {
+    from { transform:rotate(0deg); }
+    to   { transform:rotate(360deg); }
+  }
+  .spin { animation: spin-ring 2s linear infinite; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="max-width:900px;margin:0 auto">
+  <!-- Header -->
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <div class="icon-box icon-cyan" style="width:48px;height:48px;font-size:20px"><i class="fas fa-brain"></i></div>
+    <div>
+      <h4 style="margin:0;font-family:'Outfit',sans-serif;font-weight:800;font-size:1.3rem">MRI Scan Analysis</h4>
+      <div style="color:var(--muted);font-size:12.5px">EfficientNetB0 · Transfer Learning · Grad-CAM Heatmap</div>
+    </div>
+    {% if cnn_ready %}
+    <span class="pill pill-green ms-auto"><i class="fas fa-circle" style="font-size:7px"></i> Model Ready</span>
+    {% else %}
+    <span class="pill pill-amber ms-auto"><i class="fas fa-triangle-exclamation" style="font-size:9px"></i> Model Not Loaded</span>
+    {% endif %}
+  </div>
+
+  {% if not cnn_ready %}
+  <div class="alert alert-warning d-flex gap-2 align-items-start mb-4">
+    <i class="fas fa-triangle-exclamation mt-1" style="flex-shrink:0"></i>
+    <span><strong>CNN model not found.</strong> Place <code>cnn_model.keras</code> in the <code>models/</code> directory and restart the server.</span>
+  </div>
+  {% endif %}
+
+  <div class="row g-4">
+    <!-- Upload -->
+    <div class="col-md-7">
+      <div class="card-glass">
+        <div class="card-glass-header">
+          <div class="icon-box icon-cyan" style="width:30px;height:30px;font-size:12px"><i class="fas fa-upload"></i></div>
+          <h6>Upload Brain MRI Image</h6>
+        </div>
+        <div class="card-glass-body">
+          <form action="{{ url_for('cnn_predict') }}" method="POST" enctype="multipart/form-data" id="cnnForm">
+            <div class="upload-zone mb-3" id="dropZone" onclick="document.getElementById('mri_file').click()">
+              <div id="upload-prompt">
+                <div class="upload-icon">
+                  <i class="fas fa-brain" id="uploadIcon"></i>
+                </div>
+                <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text);margin-bottom:6px">
+                  Drop your MRI image here
+                </div>
+                <div style="color:var(--muted);font-size:13px">or click to browse files</div>
+                <div style="color:var(--muted2);font-size:11.5px;margin-top:10px;padding:6px 16px;background:var(--bg3);border-radius:99px;display:inline-block">
+                  PNG · JPG · JPEG · BMP · TIFF
+                </div>
+              </div>
+              <div id="preview-wrap" style="text-align:center">
+                <img id="preview-img" src="" alt="Preview"
+                     style="max-height:230px;border-radius:10px;max-width:100%;object-fit:contain;border:1px solid var(--border2);box-shadow:0 0 20px rgba(0,212,255,0.1)">
+                <div id="preview-name" style="margin-top:10px;font-size:12px;color:var(--cyan);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center;gap:6px">
+                  <i class="fas fa-image"></i> <span id="fname"></span>
+                </div>
+                <button type="button" onclick="clearPreview(event)" style="margin-top:8px;background:var(--red-dim);border:1px solid rgba(239,68,68,0.3);color:var(--red);border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer">
+                  <i class="fas fa-times"></i> Remove
+                </button>
+              </div>
+            </div>
+
+            <input type="file" name="mri_image" id="mri_file" accept="image/*" class="d-none" onchange="previewImage(event)">
+
+            <button type="submit" class="btn-green d-flex align-items-center justify-content-center gap-2 w-100"
+                    style="padding:0.75rem;font-size:14px;border-radius:10px;" id="submitBtn"
+                    {% if not cnn_ready %}disabled{% endif %}>
+              {% if cnn_ready %}
+              <i class="fas fa-microscope"></i> Analyze &amp; Generate Grad-CAM
+              {% else %}
+              <i class="fas fa-lock"></i> Model Not Available
+              {% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info panels -->
+    <div class="col-md-5">
+      <div class="card-glass mb-3">
+        <div class="card-glass-header">
+          <div class="icon-box icon-violet" style="width:30px;height:30px;font-size:12px"><i class="fas fa-list"></i></div>
+          <h6>Detection Classes</h6>
+        </div>
+        <div class="card-glass-body">
+          {% for cls, color, desc in [
+            ('Non Dementia','#10b981','No significant signs of cognitive decline'),
+            ('Very Mild Dementia','#00d4ff','Subtle memory lapses, minimal changes'),
+            ('Mild Dementia','#f59e0b','Noticeable memory and functional impairment'),
+            ('Moderate Dementia','#ef4444','Significant cognitive decline, clear changes'),
+          ] %}
+          <div class="class-row">
+            <div class="class-dot" style="background:{{ color }};box-shadow:0 0 8px {{ color }}55"></div>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:13px;color:{{ color }}">{{ cls }}</div>
+              <div style="font-size:11.5px;color:var(--muted)">{{ desc }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card-glass">
+        <div class="card-glass-header">
+          <div class="icon-box icon-red" style="width:30px;height:30px;font-size:12px"><i class="fas fa-fire"></i></div>
+          <h6>Grad-CAM Visualization</h6>
+        </div>
+        <div class="card-glass-body">
+          <p style="color:var(--muted);font-size:12.5px;margin-bottom:1rem;line-height:1.65">
+            After prediction, a <strong style="color:var(--text)">Grad-CAM heatmap</strong> will be generated showing which brain regions drove the CNN's decision.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            {% for c, lbl in [
+              ('linear-gradient(90deg,#ef4444,#ff6b6b)','High activation — key region'),
+              ('linear-gradient(90deg,#ff9500,#ffb74d)','Medium activation'),
+              ('linear-gradient(90deg,#2196f3,#64b5f6)','Low activation'),
+              ('linear-gradient(90deg,#1a237e,#283593)','Background')
+            ] %}
+            <div style="display:flex;align-items:center;gap:10px;font-size:12px">
+              <div class="gradcam-swatch" style="background:{{ c }}"></div>
+              <span style="color:var(--muted)">{{ lbl }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+  function previewImage(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('upload-prompt').style.display = 'none';
+      document.getElementById('preview-wrap').style.display = 'block';
+      document.getElementById('preview-img').src = ev.target.result;
+      document.getElementById('fname').textContent = file.name;
+    };
+    reader.readAsDataURL(file);
+  }
+  function clearPreview(e) {
+    e.stopPropagation();
+    document.getElementById('mri_file').value = '';
+    document.getElementById('upload-prompt').style.display = 'block';
+    document.getElementById('preview-wrap').style.display = 'none';
+  }
+
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const dt = new DataTransfer(); dt.items.add(file);
+      document.getElementById('mri_file').files = dt.files;
+      previewImage({target:{files:[file]}});
+    }
+  });
+
+  // Loading state on submit
+  document.getElementById('cnnForm').addEventListener('submit', () => {
+    const btn = document.getElementById('submitBtn');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+    btn.disabled = true;
+  });
+</script>
+{% endblock %}

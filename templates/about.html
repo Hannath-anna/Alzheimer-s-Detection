@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}About — NeuroScan{% endblock %}
+{% block extra_css %}
+<style>
+  .about-hero {
+    background: linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(0,212,255,0.04) 100%);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2.5rem;
+    margin-bottom: 1.75rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .about-hero::before {
+    content: '';
+    position: absolute; top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .about-hero::after {
+    content: '';
+    position: absolute; bottom: -40px; left: -40px;
+    width: 160px; height: 160px;
+    background: radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .capability-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem;
+    height: 100%;
+    transition: all 0.3s;
+  }
+  .capability-card:hover {
+    border-color: var(--border2);
+    transform: translateY(-3px);
+    box-shadow: 0 0 25px rgba(0,212,255,0.08);
+  }
+  .tech-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(11,21,37,0.8);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    transition: all 0.2s;
+    font-size: 12.5px; font-weight: 500;
+  }
+  .tech-badge:hover { border-color: var(--border2); background: var(--bg4); }
+  .stat-mini {
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    text-align: center;
+  }
+  .stat-mini-val {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.4rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--cyan), var(--violet));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .stat-mini-lbl { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .workflow-step {
+    display: flex; gap: 1rem; align-items: flex-start;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .workflow-step:last-child { border-bottom: none; padding-bottom: 0; }
+  .step-num {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    background: var(--cyan-dim); border: 1px solid rgba(0,212,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 13px;
+    color: var(--cyan);
+  }
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="max-width:860px;margin:0 auto">
+
+  <!-- Hero -->
+  <div class="about-hero">
+    <div style="position:relative;z-index:1">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="icon-box icon-violet" style="width:52px;height:52px;font-size:22px"><i class="fas fa-brain"></i></div>
+        <div>
+          <h2 style="margin:0;font-family:'Outfit',sans-serif;font-weight:900;font-size:1.7rem;letter-spacing:-0.5px">
+            About NeuroScan
+          </h2>
+          <div style="color:var(--muted);font-size:13px;margin-top:4px">Research-grade dual-modality Alzheimer's detection system</div>
+        </div>
+      </div>
+      <p style="color:var(--muted);font-size:13.5px;line-height:1.8;max-width:680px;margin:0">
+        NeuroScan is a dual-modality research system combining
+        <strong style="color:var(--text)">clinical biomarker ensemble ML</strong> with
+        <strong style="color:var(--text)">MRI brain scan CNN</strong>. It features
+        <strong style="color:var(--violet)">SHAP explainability</strong> via manual TreeSHAP path-tracing,
+        <strong style="color:var(--cyan)">ensemble voting</strong> across Random Forest, Gradient Boosting, and SVM,
+        and <strong style="color:var(--red)">Grad-CAM heatmaps</strong> showing exactly which brain regions drove each prediction.
+      </p>
+
+      <!-- Key stats row -->
+      <div class="row g-2 mt-3">
+        <div class="col-6 col-md-3"><div class="stat-mini"><div class="stat-mini-val">94.7%</div><div class="stat-mini-lbl">Best ML Accuracy</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-mini"><div class="stat-mini-val">2,149</div><div class="stat-mini-lbl">Patient Records</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-mini"><div class="stat-mini-val">32</div><div class="stat-mini-lbl">Clinical Biomarkers</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-mini"><div class="stat-mini-val">4</div><div class="stat-mini-lbl">MRI Dementia Stages</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Capabilities row -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="capability-card">
+        <div class="icon-box icon-violet mb-2" style="font-size:17px"><i class="fas fa-water-ladder"></i></div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px">SHAP Explainability</div>
+        <div style="color:var(--muted);font-size:12.5px;line-height:1.65">
+          Manual TreeSHAP path-tracing generates per-patient waterfall charts showing which biomarkers pushed the prediction up or down — transparent, not a black box.
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="capability-card">
+        <div class="icon-box icon-cyan mb-2" style="font-size:17px"><i class="fas fa-list-check"></i></div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px">Ensemble Voting</div>
+        <div style="color:var(--muted);font-size:12.5px;line-height:1.65">
+          Three independent models — Random Forest, Gradient Boosting, SVM — each cast a vote. Majority consensus reduces bias and improves robustness over any single model.
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="capability-card">
+        <div class="icon-box icon-red mb-2" style="font-size:17px"><i class="fas fa-fire"></i></div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px">Grad-CAM Heatmaps</div>
+        <div style="color:var(--muted);font-size:12.5px;line-height:1.65">
+          Gradient-weighted Class Activation Maps overlay a color heatmap on MRI scans — revealing the exact brain regions that drove the EfficientNetB0 CNN's decision.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ML + CNN specs side by side -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card-dark h-100">
+        <div class="card-header-dark">
+          <div class="icon-box icon-violet" style="width:30px;height:30px;font-size:12px"><i class="fas fa-table-list"></i></div>
+          <h6>Clinical ML System</h6>
+          <span class="pill pill-violet ms-auto" style="font-size:10px">3 models</span>
+        </div>
+        <div class="card-body-dark">
+          <table class="tbl">
+            <tr><td style="color:var(--muted)">Models</td><td><strong>RF + GB + SVM</strong> Ensemble</td></tr>
+            <tr><td style="color:var(--muted)">Dataset</td><td>2,149 patient records</td></tr>
+            <tr><td style="color:var(--muted)">Features</td><td>32 clinical biomarkers</td></tr>
+            <tr><td style="color:var(--muted)">Validation</td><td>5-Fold Cross-Validation</td></tr>
+            <tr><td style="color:var(--muted)">RF Accuracy</td><td><strong style="color:var(--green)">94.4%</strong></td></tr>
+            <tr><td style="color:var(--muted)">GB Accuracy</td><td><strong style="color:var(--green)">94.7%</strong></td></tr>
+            <tr><td style="color:var(--muted)">XAI Method</td><td><span class="pill pill-violet" style="font-size:10px"><i class="fas fa-water-ladder"></i> Manual TreeSHAP</span></td></tr>
+            <tr><td style="color:var(--muted)">Output</td><td>Binary + probability + risk level</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card-dark h-100">
+        <div class="card-header-dark">
+          <div class="icon-box icon-cyan" style="width:30px;height:30px;font-size:12px"><i class="fas fa-brain"></i></div>
+          <h6>MRI CNN System</h6>
+          <span class="pill pill-cyan ms-auto" style="font-size:10px">EfficientNetB0</span>
+        </div>
+        <div class="card-body-dark">
+          <table class="tbl">
+            <tr><td style="color:var(--muted)">Architecture</td><td><strong>EfficientNetB0</strong> (Transfer Learning)</td></tr>
+            <tr><td style="color:var(--muted)">Pretrained On</td><td>ImageNet (1.2M images)</td></tr>
+            <tr><td style="color:var(--muted)">Input Size</td><td>224 × 224 × 3 RGB</td></tr>
+            <tr><td style="color:var(--muted)">Classes</td><td>4 dementia stages</td></tr>
+            <tr><td style="color:var(--muted)">Training</td><td>2-phase fine-tuning</td></tr>
+            <tr><td style="color:var(--muted)">Augmentation</td><td>Rotation, flip, zoom, shear</td></tr>
+            <tr><td style="color:var(--muted)">XAI Method</td><td><span class="pill pill-red" style="font-size:10px"><i class="fas fa-fire"></i> Grad-CAM</span></td></tr>
+            <tr><td style="color:var(--muted)">Output</td><td>4-class + confidence %</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="card-dark mb-4">
+    <div class="card-header-dark">
+      <div class="icon-box icon-amber" style="width:30px;height:30px;font-size:12px"><i class="fas fa-diagram-project"></i></div>
+      <h6>How It Works</h6>
+    </div>
+    <div class="card-body-dark">
+      <div class="row g-0">
+        <div class="col-md-6">
+          <div style="font-size:11px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.75rem">Clinical ML Path</div>
+          <div class="workflow-step">
+            <div class="step-num">1</div>
+            <div><div style="font-weight:600;font-size:13px">Enter 32 Biomarkers</div><div style="font-size:12px;color:var(--muted)">Demographics, cognitive scores, lifestyle, vitals</div></div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num">2</div>
+            <div><div style="font-weight:600;font-size:13px">3 Models Predict</div><div style="font-size:12px;color:var(--muted)">RF, GB and SVM each produce independent results</div></div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num">3</div>
+            <div><div style="font-weight:600;font-size:13px">Majority Vote</div><div style="font-size:12px;color:var(--muted)">Consensus prediction with avg. probability</div></div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num">4</div>
+            <div><div style="font-weight:600;font-size:13px">SHAP Explanation</div><div style="font-size:12px;color:var(--muted)">Waterfall chart reveals top contributing features</div></div>
+          </div>
+        </div>
+        <div class="col-md-6" style="padding-left:1.5rem;border-left:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.75rem">MRI CNN Path</div>
+          <div class="workflow-step">
+            <div class="step-num" style="background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.25);color:var(--cyan)">1</div>
+            <div><div style="font-weight:600;font-size:13px">Upload MRI Scan</div><div style="font-size:12px;color:var(--muted)">PNG/JPG brain scan image</div></div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num" style="background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.25);color:var(--cyan)">2</div>
+            <div><div style="font-weight:600;font-size:13px">Preprocess & Resize</div><div style="font-size:12px;color:var(--muted)">Normalized to 224×224, ImageNet mean/std</div></div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num" style="background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.25);color:var(--cyan)">3</div>
+            <div><div style="font-weight:600;font-size:13px">CNN Classification</div><div style="font-size:12px;color:var(--muted)">EfficientNetB0 predicts one of 4 dementia stages</div></div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-num" style="background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.25);color:var(--cyan)">4</div>
+            <div><div style="font-weight:600;font-size:13px">Grad-CAM Heatmap</div><div style="font-size:12px;color:var(--muted)">Highlights activated brain regions on scan</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tech Stack -->
+  <div class="card-dark mb-4">
+    <div class="card-header-dark">
+      <div class="icon-box icon-green" style="width:30px;height:30px;font-size:12px"><i class="fas fa-layer-group"></i></div>
+      <h6>Technology Stack</h6>
+    </div>
+    <div class="card-body-dark">
+      <div class="row g-2">
+        {% set tech = [
+          ('Python 3.10+',    'fab fa-python',           '--cyan',   'Core language'),
+          ('Flask',           'fas fa-flask',             '--green',  'Web framework'),
+          ('Scikit-learn',    'fas fa-gears',             '--amber',  'Ensemble ML'),
+          ('TensorFlow/Keras','fas fa-microchip',         '--red',    'CNN training'),
+          ('Pandas / NumPy',  'fas fa-database',          '--violet', 'Data processing'),
+          ('Matplotlib',      'fas fa-chart-bar',         '--amber',  'Visualization'),
+          ('Bootstrap 5',     'fab fa-bootstrap',         '--cyan',   'UI framework'),
+          ('Chart.js',        'fas fa-chart-pie',         '--red',    'Dashboard charts'),
+          ('SHAP (manual)',   'fas fa-water-ladder',      '--violet', 'Explainability'),
+          ('Grad-CAM',        'fas fa-fire',              '--red',    'CNN heatmaps')
+        ] %}
+        {% for name, icon, color, role in tech %}
+        <div class="col-6 col-md-4 col-lg-3">
+          <div class="tech-badge">
+            <i class="{{ icon }}" style="color:var({{ color }});font-size:14px;flex-shrink:0"></i>
+            <div>
+              <div style="font-weight:600;font-size:12px">{{ name }}</div>
+              <div style="font-size:10.5px;color:var(--muted2)">{{ role }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="card-dark mb-0">
+    <div class="card-header-dark">
+      <div class="icon-box icon-red" style="width:30px;height:30px;font-size:12px"><i class="fas fa-shield-halved"></i></div>
+      <h6>Medical Disclaimer</h6>
+    </div>
+    <div class="card-body-dark">
+      <div class="alert alert-danger mb-0 d-flex gap-3 align-items-start">
+        <i class="fas fa-triangle-exclamation mt-1" style="flex-shrink:0;font-size:18px"></i>
+        <div style="font-size:13px;line-height:1.75">
+          This system is developed <strong>strictly for research and educational purposes</strong>. It is <strong>NOT a certified medical device</strong> and must NOT be used for clinical diagnosis. Results should never replace the judgment of qualified medical professionals. Always consult a certified neurologist for any medical concerns. The developers assume no liability for decisions made based on this system's output.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

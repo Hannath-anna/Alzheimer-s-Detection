@@ -712,5 +712,246 @@ def debug_cnn():
     lines.append("</pre>")
     return "".join(lines)
 
+
+# ══════════════════════════════════════════════
+#  FUSION HELPER  (no model changes)
+# ══════════════════════════════════════════════
+
+# CNN class → severity index (0=none, 1=very mild, 2=mild, 3=moderate)
+_CNN_SEVERITY_IDX = {
+    'Non_Demented':       0,
+    'Very_Mild_Demented': 1,
+    'Mild_Demented':      2,
+    'Moderate_Demented':  3,
+}
+
+def fuse_results(ml_prob_pos_pct, cnn_probs_dict, ml_weight=0.40, cnn_weight=0.60):
+    """
+    ml_prob_pos_pct : float — ML Alzheimer probability 0–100
+    cnn_probs_dict  : dict  — {raw_class_key: probability_0_to_1}
+    Returns         : dict  — final verdict fields
+    """
+    ml_prob  = ml_prob_pos_pct / 100.0
+
+    # CNN: P(alzheimer) = 1 - P(Non_Demented)
+    p_non    = cnn_probs_dict.get('Non_Demented', 0.0)
+    cnn_alz  = 1.0 - p_non
+
+    # CNN expected severity (0–3)
+    cnn_sev  = sum(_CNN_SEVERITY_IDX.get(k, 0) * v for k, v in cnn_probs_dict.items())
+
+    # ML severity proxy (0–3 scale)
+    ml_sev   = ml_prob * 3.0
+
+    # Combined
+    combined_prob = ml_weight * ml_prob  + cnn_weight * cnn_alz
+    combined_sev  = ml_weight * ml_sev   + cnn_weight * cnn_sev
+
+    # Map combined severity → label/badge
+    if combined_sev < 0.5:
+        badge, label, icon = 'none',   "No Alzheimer's Detected",           'fa-circle-check'
+    elif combined_sev < 1.3:
+        badge, label, icon = 'low',    'Very Mild Cognitive Impairment',    'fa-circle-info'
+    elif combined_sev < 2.2:
+        badge, label, icon = 'medium', 'Mild Dementia Indicated',           'fa-triangle-exclamation'
+    else:
+        badge, label, icon = 'high',   'Moderate Dementia Detected',        'fa-radiation'
+
+    risk_label = {'none': 'Low Risk', 'low': 'Low-Moderate Risk',
+                  'medium': 'Moderate Risk', 'high': 'High Risk'}[badge]
+
+    # Agreement between the two models
+    ml_vote_alz  = ml_prob  >= 0.30
+    cnn_vote_alz = cnn_alz  >= 0.30
+
+    if ml_vote_alz == cnn_vote_alz:
+        agree_cls, agree_icon, agree_text = 'agree-full',     'fa-handshake',           'Models Agree'
+    elif abs(ml_prob - cnn_alz) < 0.25:
+        agree_cls, agree_icon, agree_text = 'agree-partial',  'fa-circle-half-stroke',  'Partial Agreement'
+    else:
+        agree_cls, agree_icon, agree_text = 'agree-conflict', 'fa-triangle-exclamation','Models Conflict — Review'
+
+    return {
+        'badge':          badge,
+        'label':          label,
+        'icon':           icon,
+        'combined_prob':  round(combined_prob * 100, 1),
+        'severity_score': round(combined_sev, 2),
+        'risk_label':     risk_label,
+        'agree_cls':      agree_cls,
+        'agree_icon':     agree_icon,
+        'agree_text':     agree_text,
+    }
+
+
+# ══════════════════════════════════════════════
+#  COMBINED ROUTES
+# ══════════════════════════════════════════════
+
+@app.route('/combined')
+def combined_form():
+    return render_template('combined_predict.html',
+        cnn_ready = CNN_MODEL is not None,
+        ml_ready  = bool(ML_MODELS),
+    )
+
+
+@app.route('/combined/predict', methods=['POST'])
+def combined_predict():
+    ml_data       = None
+    cnn_data      = None
+    cnn_probs_raw = {}
+    errors        = []
+
+    # ── 1. ML inference (same logic as ml_predict, no changes) ──
+    if ML_MODELS:
+        try:
+            features     = ML_ARTIFACTS['feature_names']
+            feature_vals = [float(request.form.get(f, '') or 0) for f in features]
+            X            = np.array(feature_vals).reshape(1, -1)
+            X_scaled     = ML_SCALER.transform(X)
+
+            model_results, votes = [], []
+            for name, model in ML_MODELS.items():
+                proba    = model.predict_proba(X_scaled)[0]
+                pred     = int(np.argmax(proba))
+                votes.append(pred)
+                ens_info = ML_ARTIFACTS.get('ensemble_results', {}).get(name, {})
+                prob_pos = round(float(proba[1]) * 100, 2)
+                model_results.append({
+                    'name':       name,
+                    'prediction': pred,
+                    'label':      'Alzheimer' if pred == 1 else 'No Alzheimer',
+                    'prob_pos':   prob_pos,
+                    'prob_neg':   round(100 - prob_pos, 2),
+                    'confidence': round(float(max(proba)) * 100, 2),
+                    'test_acc':   round(float(ens_info.get('acc', 0)) * 100, 1),
+                    'auc':        round(float(ens_info.get('auc', 0)) * 100, 1),
+                })
+
+            final_vote   = int(np.bincount(votes).argmax())
+            avg_prob_pos = round(float(np.mean([r['prob_pos'] for r in model_results])), 2)
+            risk, risk_lvl, risk_color = risk_meta(avg_prob_pos / 100)
+
+            ml_data = {
+                'final_label':   'Alzheimer Detected' if final_vote == 1 else 'No Alzheimer Detected',
+                'final_vote':    final_vote,
+                'avg_prob_pos':  avg_prob_pos,
+                'avg_prob_neg':  round(100 - avg_prob_pos, 2),
+                'risk_lvl':      risk_lvl,
+                'risk_color':    risk_color,
+                'vote_count':    votes.count(final_vote),
+                'total_models':  len(ML_MODELS),
+                'model_results': model_results,
+            }
+        except Exception as e:
+            errors.append(f'ML error: {e}')
+
+    # ── 2. CNN inference (same logic as cnn_predict, no changes) ──
+    if CNN_MODEL and 'mri_image' in request.files and request.files['mri_image'].filename != '':
+        try:
+            file      = request.files['mri_image']
+            base, ext = os.path.splitext(secure_filename(file.filename))
+            filename  = f"{base}_{int(time.time())}{ext}"
+            filepath  = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            cleanup_old_uploads()
+
+            img_size = CNN_ARTIFACTS.get('img_size', (224, 224))
+            img_arr  = np.expand_dims(
+                np.array(Image.open(filepath).convert('RGB').resize(img_size),
+                         dtype=np.float32), 0
+            )
+            preds         = CNN_MODEL.predict(img_arr, verbose=0)[0]
+            class_indices = CNN_ARTIFACTS['class_indices']
+            idx_to_class  = {v: k for k, v in class_indices.items()}
+            pred_idx      = int(np.argmax(preds))
+            pred_class    = idx_to_class.get(pred_idx, 'Unknown')
+            severity, badge = CNN_SEVERITY.get(pred_class, ('Unknown', 'medium'))
+
+            _class_color = {
+                'Non_Demented':       ('var(--green)', 'prog-green'),
+                'Very_Mild_Demented': ('var(--cyan)',  'prog-cyan'),
+                'Mild_Demented':      ('var(--amber)', 'prog-yellow'),
+                'Moderate_Demented':  ('var(--red)',   'prog-red'),
+            }
+            all_probs = sorted([
+                {'class':     CNN_DISPLAY.get(idx_to_class.get(i, ''), f'Class {i}'),
+                 'prob':      round(float(preds[i]) * 100, 2),
+                 'raw_key':   idx_to_class.get(i, f'class_{i}'),
+                 'txt_color': _class_color.get(idx_to_class.get(i, ''),
+                                               ('var(--text)', 'prog-cyan'))[0],
+                 'bar_color': _class_color.get(idx_to_class.get(i, ''),
+                                               ('var(--text)', 'prog-cyan'))[1]}
+                for i in range(len(preds))
+            ], key=lambda x: x['prob'], reverse=True)
+
+            for i in range(len(preds)):
+                raw_key = idx_to_class.get(i, f'class_{i}')
+                cnn_probs_raw[raw_key] = float(preds[i])
+
+            cnn_data = {
+                'pred_class':  CNN_DISPLAY.get(pred_class, pred_class),
+                'severity':    severity,
+                'badge':       badge,
+                'confidence':  round(float(preds[pred_idx]) * 100, 2),
+                'all_probs':   all_probs,
+                'img_url':     url_for('static', filename=f'uploads/{filename}'),
+            }
+        except Exception as e:
+            errors.append(f'CNN error: {e}')
+
+    # ── 3. Fuse → final conclusion ──────────────────────────────
+    if ml_data and cnn_data:
+        final = fuse_results(ml_data['avg_prob_pos'], cnn_probs_raw)
+    elif ml_data:
+        p = ml_data['avg_prob_pos'] / 100
+        risk, _, _ = risk_meta(p)
+        sev = p * 3
+        if sev < 0.5:    badge = 'none'
+        elif sev < 1.3:  badge = 'low'
+        elif sev < 2.2:  badge = 'medium'
+        else:             badge = 'high'
+        final = {
+            'badge':          badge,
+            'label':          ml_data['final_label'],
+            'icon':           'fa-circle-check' if ml_data['final_vote'] == 0 else 'fa-triangle-exclamation',
+            'combined_prob':  ml_data['avg_prob_pos'],
+            'severity_score': round(p * 3, 2),
+            'risk_label':     risk,
+            'agree_cls':      'agree-partial',
+            'agree_icon':     'fa-circle-half-stroke',
+            'agree_text':     'Clinical Only (No MRI)',
+        }
+    elif cnn_data:
+        badge      = cnn_data['badge']
+        cnn_alz_p  = round((1 - cnn_probs_raw.get('Non_Demented', 0)) * 100, 1)
+        sev_idx    = {'none': 0, 'low': 1, 'medium': 2, 'high': 3}[badge]
+        icon_map   = {'none': 'fa-circle-check', 'low': 'fa-circle-info',
+                      'medium': 'fa-triangle-exclamation', 'high': 'fa-radiation'}
+        final = {
+            'badge':          badge,
+            'label':          cnn_data['severity'],
+            'icon':           icon_map[badge],
+            'combined_prob':  cnn_alz_p,
+            'severity_score': round(float(sev_idx), 2),
+            'risk_label':     {'none':'Low Risk','low':'Low-Moderate Risk',
+                               'medium':'Moderate Risk','high':'High Risk'}[badge],
+            'agree_cls':      'agree-partial',
+            'agree_icon':     'fa-circle-half-stroke',
+            'agree_text':     'MRI Only (No Clinical)',
+        }
+    else:
+        final = {
+            'badge': 'none', 'label': 'Analysis Incomplete', 'icon': 'fa-circle-xmark',
+            'combined_prob': 0, 'severity_score': 0, 'risk_label': 'N/A',
+            'agree_cls': 'agree-conflict', 'agree_icon': 'fa-circle-xmark', 'agree_text': 'No Data',
+        }
+
+    return render_template('combined_result.html',
+        ml=ml_data, cnn=cnn_data, final=final, errors=errors,
+    )
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

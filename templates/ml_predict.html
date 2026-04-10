@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+{% block title %}Clinical Analysis{% endblock %}
+{% block extra_css %}
+<style>
+  /* Stepper */
+  .stepper { display:flex; align-items:flex-start; margin-bottom:2.5rem; }
+  .step {
+    flex:1; display:flex; align-items:center; position:relative; min-width:0;
+  }
+  .step:last-child { flex:none; }
+  .step-node {
+    display:flex; align-items:center; gap:8px; flex-shrink:0; cursor:default;
+    position:relative; z-index:1;
+  }
+  .step-line {
+    flex:1; height:2px; background:var(--border);
+    margin: 0 6px; margin-top:-2px;
+    transition: background 0.4s ease;
+    border-radius:2px;
+  }
+  .step-circle {
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; flex-shrink:0;
+    transition:all 0.3s ease;
+    border: 2px solid var(--border);
+    background: var(--bg3); color: var(--muted);
+    position:relative;
+  }
+  .step.active .step-circle { border-color:var(--cyan); background:rgba(0,212,255,0.12); color:var(--cyan); box-shadow:0 0 15px rgba(0,212,255,0.3); }
+  .step.done   .step-circle { border-color:var(--green); background:rgba(16,185,129,0.2); color:var(--green); }
+  .step.done   .step-circle .step-num-label { display:none; }
+  .step.done   .step-circle .step-done-icon { display:inline !important; }
+  .step.done   .step-line   { background: var(--green); opacity:0.5; }
+  .step-label { font-size:12px; font-weight:600; color:var(--muted2); white-space:nowrap; }
+  .step.active .step-label { color:var(--text); }
+  .step.done   .step-label { color:var(--green); }
+
+  /* Section panels */
+  .form-panel { display:none; animation: panelIn 0.4s ease; }
+  .form-panel.active { display:block; }
+  @keyframes panelIn { from { opacity:0; transform:translateX(15px); } to { opacity:1; transform:translateX(0); } }
+
+  /* Navigation */
+  .step-nav { display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid var(--border); }
+
+  /* Form helper text */
+  .form-hint { font-size:11px; color:var(--muted2); margin-top:4px; }
+
+  /* Progress bar at top */
+  .form-progress { height:3px; background:var(--bg4); border-radius:0; position:fixed; top:70px; left:0; right:0; z-index:999; }
+  .form-progress-fill { height:100%; background:linear-gradient(90deg,var(--violet),var(--cyan)); transition:width 0.4s ease; }
+
+  /* Input group enhancement */
+  .input-group-text { background:var(--bg4); border:1px solid var(--border); color:var(--muted); font-size:12px; border-radius:10px 0 0 10px; }
+  .input-group .form-control { border-radius:0 10px 10px 0; }
+
+  /* Card enhanced */
+  .form-section-card {
+    background:rgba(7,15,26,0.75); backdrop-filter:blur(20px);
+    border:1px solid var(--border); border-radius:16px; overflow:hidden;
+  }
+  .form-section-header {
+    padding:1rem 1.4rem; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:12px;
+    background:rgba(0,212,255,0.02);
+  }
+  .form-section-body { padding:1.5rem; }
+
+  /* Toggle buttons for Yes/No */
+  .toggle-group { display:flex; gap:8px; }
+  .toggle-btn {
+    flex:1; padding:0.55rem; border-radius:8px; font-size:12.5px; font-weight:600;
+    border:1px solid var(--border); background:var(--bg3); color:var(--muted);
+    cursor:pointer; transition:all 0.2s; text-align:center;
+  }
+  .toggle-btn.selected-no  { border-color:var(--green); background:rgba(16,185,129,0.12); color:var(--green); }
+  .toggle-btn.selected-yes { border-color:var(--red);   background:rgba(239,68,68,0.12);  color:var(--red); }
+  .toggle-btn:hover { border-color:var(--border2); }
+</style>
+{% endblock %}
+{% block content %}
+
+<!-- Progress bar -->
+<div class="form-progress"><div class="form-progress-fill" id="progressFill" style="width:20%"></div></div>
+
+<div style="max-width:860px;margin:0 auto">
+  <!-- Header -->
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <div class="icon-box icon-violet" style="width:48px;height:48px;font-size:20px"><i class="fas fa-table-list"></i></div>
+    <div>
+      <h4 style="margin:0;font-family:'Outfit',sans-serif;font-weight:800;font-size:1.3rem">Clinical Data Analysis</h4>
+      <div style="color:var(--muted);font-size:12.5px">Ensemble ML · SHAP Explainability · 32 biomarkers</div>
+    </div>
+    <div class="ms-auto d-flex gap-2 flex-wrap">
+      <span class="pill pill-violet">Random Forest</span>
+      <span class="pill pill-cyan">Gradient Boosting</span>
+      <span class="pill pill-gray">SVM</span>
+    </div>
+  </div>
+
+  <!-- Stepper -->
+  <div class="stepper" id="stepper">
+    <div class="step active" data-step="0">
+      <div class="step-node"><div class="step-circle"><i class="fas fa-check step-done-icon" style="display:none;font-size:10px"></i><span class="step-num-label">1</span></div><div class="step-label">Demographics</div></div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step" data-step="1">
+      <div class="step-node"><div class="step-circle"><i class="fas fa-check step-done-icon" style="display:none;font-size:10px"></i><span class="step-num-label">2</span></div><div class="step-label">Cognitive</div></div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step" data-step="2">
+      <div class="step-node"><div class="step-circle"><i class="fas fa-check step-done-icon" style="display:none;font-size:10px"></i><span class="step-num-label">3</span></div><div class="step-label">Lifestyle</div></div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step" data-step="3">
+      <div class="step-node"><div class="step-circle"><i class="fas fa-check step-done-icon" style="display:none;font-size:10px"></i><span class="step-num-label">4</span></div><div class="step-label">Medical</div></div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step" data-step="4">
+      <div class="step-node"><div class="step-circle"><i class="fas fa-check step-done-icon" style="display:none;font-size:10px"></i><span class="step-num-label">5</span></div><div class="step-label">Vitals</div></div>
+    </div>
+  </div>
+
+  <form action="{{ url_for('ml_predict') }}" method="POST" id="mlForm">
+
+    <!-- Step 1: Demographics -->
+    <div class="form-panel active" id="panel-0">
+      <div class="form-section-card mb-3">
+        <div class="form-section-header">
+          <div class="icon-box icon-violet" style="width:32px;height:32px;font-size:13px"><i class="fas fa-user"></i></div>
+          <div>
+            <div style="font-weight:700;font-size:14px">Patient Demographics</div>
+            <div style="font-size:11.5px;color:var(--muted)">Basic patient information</div>
+          </div>
+        </div>
+        <div class="form-section-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">Age</label>
+              <input type="number" name="Age" class="form-control" min="18" max="120" placeholder="72" required>
+              <div class="form-hint">18 – 120 years</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Gender</label>
+              <select name="Gender" class="form-select">
+                <option value="0">Female</option>
+                <option value="1">Male</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Ethnicity</label>
+              <select name="Ethnicity" class="form-select">
+                <option value="0">Caucasian</option>
+                <option value="1">African American</option>
+                <option value="2">Asian</option>
+                <option value="3">Other</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Education Level</label>
+              <select name="EducationLevel" class="form-select">
+                <option value="0">None</option>
+                <option value="1">High School</option>
+                <option value="2">Bachelor's</option>
+                <option value="3">Higher Degree</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">BMI</label>
+              <input type="number" name="BMI" class="form-control" step="0.1" min="10" max="60" placeholder="25.4">
+              <div class="form-hint">Body Mass Index</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-nav">
+        <div></div>
+        <button type="button" class="btn-violet d-flex align-items-center gap-2" onclick="nextStep()">Next <i class="fas fa-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <!-- Step 2: Cognitive -->
+    <div class="form-panel" id="panel-1">
+      <div class="form-section-card mb-3">
+        <div class="form-section-header">
+          <div class="icon-box icon-red" style="width:32px;height:32px;font-size:13px"><i class="fas fa-brain"></i></div>
+          <div>
+            <div style="font-weight:700;font-size:14px">Cognitive &amp; Functional Assessment</div>
+            <div style="font-size:11.5px;color:var(--muted)">High importance features</div>
+          </div>
+          <span class="pill pill-red ms-auto" style="font-size:10px"><i class="fas fa-fire"></i> High Impact</span>
+        </div>
+        <div class="form-section-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">MMSE Score <span style="color:var(--muted);font-weight:400">(0 – 30)</span></label>
+              <input type="number" name="MMSE" class="form-control" step="0.1" min="0" max="30" placeholder="24.5">
+              <div class="form-hint">Mini-Mental State Exam · lower = worse</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Functional Assessment <span style="color:var(--muted);font-weight:400">(0 – 10)</span></label>
+              <input type="number" name="FunctionalAssessment" class="form-control" step="0.1" min="0" max="10" placeholder="7.2">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">ADL Score <span style="color:var(--muted);font-weight:400">(0 – 10)</span></label>
+              <input type="number" name="ADL" class="form-control" step="0.1" min="0" max="10" placeholder="6.0">
+              <div class="form-hint">Activities of Daily Living</div>
+            </div>
+          </div>
+          <div class="sep"></div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:1rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Behavioral Symptoms</div>
+          <div class="row g-3">
+            {% for name, label in [
+              ('MemoryComplaints','Memory Complaints'),
+              ('BehavioralProblems','Behavioral Problems'),
+              ('Confusion','Confusion'),
+              ('Disorientation','Disorientation'),
+              ('PersonalityChanges','Personality Changes'),
+              ('DifficultyCompletingTasks','Difficulty Completing Tasks'),
+              ('Forgetfulness','Forgetfulness')
+            ] %}
+            <div class="col-md-4">
+              <label class="form-label">{{ label }}</label>
+              <div class="toggle-group" data-target="{{ name }}">
+                <div class="toggle-btn selected-no" onclick="setToggle('{{ name }}', 0, this)">No</div>
+                <div class="toggle-btn" onclick="setToggle('{{ name }}', 1, this)">Yes</div>
+              </div>
+              <input type="hidden" name="{{ name }}" id="val-{{ name }}" value="0">
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="step-nav">
+        <button type="button" class="btn-ghost d-flex align-items-center gap-2" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+        <button type="button" class="btn-violet d-flex align-items-center gap-2" onclick="nextStep()">Next <i class="fas fa-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <!-- Step 3: Lifestyle -->
+    <div class="form-panel" id="panel-2">
+      <div class="form-section-card mb-3">
+        <div class="form-section-header">
+          <div class="icon-box icon-green" style="width:32px;height:32px;font-size:13px"><i class="fas fa-dumbbell"></i></div>
+          <div>
+            <div style="font-weight:700;font-size:14px">Lifestyle Factors</div>
+            <div style="font-size:11.5px;color:var(--muted)">Diet, exercise, habits</div>
+          </div>
+        </div>
+        <div class="form-section-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">Smoking</label>
+              <select name="Smoking" class="form-select">
+                <option value="0">Non-Smoker</option>
+                <option value="1">Smoker</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Alcohol <span style="color:var(--muted);font-weight:400">(units/wk)</span></label>
+              <input type="number" name="AlcoholConsumption" class="form-control" step="0.1" min="0" max="30" placeholder="5.0">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Physical Activity <span style="color:var(--muted);font-weight:400">(hrs/wk)</span></label>
+              <input type="number" name="PhysicalActivity" class="form-control" step="0.1" min="0" max="20" placeholder="4.5">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Diet Quality <span style="color:var(--muted);font-weight:400">(0 – 10)</span></label>
+              <input type="number" name="DietQuality" class="form-control" step="0.1" min="0" max="10" placeholder="6.5">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Sleep Quality <span style="color:var(--muted);font-weight:400">(0 – 10)</span></label>
+              <input type="number" name="SleepQuality" class="form-control" step="0.1" min="0" max="10" placeholder="7.0">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-nav">
+        <button type="button" class="btn-ghost d-flex align-items-center gap-2" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+        <button type="button" class="btn-violet d-flex align-items-center gap-2" onclick="nextStep()">Next <i class="fas fa-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <!-- Step 4: Medical History -->
+    <div class="form-panel" id="panel-3">
+      <div class="form-section-card mb-3">
+        <div class="form-section-header">
+          <div class="icon-box icon-amber" style="width:32px;height:32px;font-size:13px"><i class="fas fa-file-medical"></i></div>
+          <div>
+            <div style="font-weight:700;font-size:14px">Medical History</div>
+            <div style="font-size:11.5px;color:var(--muted)">Conditions &amp; family history</div>
+          </div>
+        </div>
+        <div class="form-section-body">
+          <div class="row g-3">
+            {% for name, label in [
+              ('FamilyHistoryAlzheimers',"Family History of Alzheimer's"),
+              ('CardiovascularDisease','Cardiovascular Disease'),
+              ('Diabetes','Diabetes'),
+              ('Depression','Depression'),
+              ('HeadInjury','Head Injury'),
+              ('Hypertension','Hypertension')
+            ] %}
+            <div class="col-md-4">
+              <label class="form-label">{{ label }}</label>
+              <div class="toggle-group" data-target="{{ name }}">
+                <div class="toggle-btn selected-no" onclick="setToggle('{{ name }}', 0, this)">No</div>
+                <div class="toggle-btn" onclick="setToggle('{{ name }}', 1, this)">Yes</div>
+              </div>
+              <input type="hidden" name="{{ name }}" id="val-{{ name }}" value="0">
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="step-nav">
+        <button type="button" class="btn-ghost d-flex align-items-center gap-2" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+        <button type="button" class="btn-violet d-flex align-items-center gap-2" onclick="nextStep()">Next <i class="fas fa-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <!-- Step 5: Vitals & Submit -->
+    <div class="form-panel" id="panel-4">
+      <div class="form-section-card mb-3">
+        <div class="form-section-header">
+          <div class="icon-box icon-red" style="width:32px;height:32px;font-size:13px"><i class="fas fa-heart-pulse"></i></div>
+          <div>
+            <div style="font-weight:700;font-size:14px">Vital Signs &amp; Blood Tests</div>
+            <div style="font-size:11.5px;color:var(--muted)">Blood pressure, cholesterol</div>
+          </div>
+        </div>
+        <div class="form-section-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Systolic BP <span style="color:var(--muted);font-weight:400">(mmHg)</span></label>
+              <input type="number" name="SystolicBP" class="form-control" min="80" max="200" placeholder="130">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Diastolic BP <span style="color:var(--muted);font-weight:400">(mmHg)</span></label>
+              <input type="number" name="DiastolicBP" class="form-control" min="50" max="130" placeholder="85">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Total Cholesterol <span style="color:var(--muted);font-weight:400">(mg/dL)</span></label>
+              <input type="number" name="CholesterolTotal" class="form-control" step="0.1" placeholder="220">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">LDL Cholesterol</label>
+              <input type="number" name="CholesterolLDL" class="form-control" step="0.1" placeholder="130">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">HDL Cholesterol</label>
+              <input type="number" name="CholesterolHDL" class="form-control" step="0.1" placeholder="55">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Triglycerides</label>
+              <input type="number" name="CholesterolTriglycerides" class="form-control" step="0.1" placeholder="180">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary card before submit -->
+      <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:12px;padding:1.25rem;margin-bottom:1.5rem">
+        <div style="font-family:'Outfit',sans-serif;font-weight:700;margin-bottom:8px;font-size:14px">Ready to Analyze</div>
+        <div style="color:var(--muted);font-size:13px">3 models will vote on your data: <span style="color:var(--violet)">Random Forest</span> · <span style="color:var(--cyan)">Gradient Boosting</span> · <span style="color:var(--muted)">SVM</span>. SHAP explanations will be generated.</div>
+      </div>
+
+      <div class="step-nav">
+        <button type="button" class="btn-ghost d-flex align-items-center gap-2" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+        <div class="d-flex gap-2">
+          <button type="reset" class="btn-ghost d-flex align-items-center gap-2"><i class="fas fa-rotate-left"></i> Reset</button>
+          <button type="submit" class="btn-violet d-flex align-items-center gap-2" style="padding:0.65rem 1.75rem;font-size:14px">
+            <i class="fas fa-microscope"></i> Run Ensemble Analysis
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let currentStep = 0;
+  const totalSteps = 5;
+
+  function updateStepper() {
+    const steps  = document.querySelectorAll('.step');
+    const panels = document.querySelectorAll('.form-panel');
+
+    steps.forEach((s, i) => {
+      s.classList.remove('active', 'done');
+      if (i === currentStep) s.classList.add('active');
+      if (i < currentStep)  s.classList.add('done');
+    });
+
+    panels.forEach((p, i) => p.classList.toggle('active', i === currentStep));
+
+    const pct = ((currentStep + 1) / totalSteps) * 100;
+    document.getElementById('progressFill').style.width = pct + '%';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function nextStep() {
+    if (currentStep < totalSteps - 1) { currentStep++; updateStepper(); }
+  }
+  function prevStep() {
+    if (currentStep > 0) { currentStep--; updateStepper(); }
+  }
+
+  function setToggle(name, val, btn) {
+    const group = btn.parentElement;
+    group.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected-no', 'selected-yes'));
+    btn.classList.add(val === 0 ? 'selected-no' : 'selected-yes');
+    document.getElementById('val-' + name).value = val;
+  }
+</script>
+{% endblock %}

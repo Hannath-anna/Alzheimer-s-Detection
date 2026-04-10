@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block extra_css %}
+<style>
+  .graph-card { transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
+  .graph-card:focus { outline: 2px solid rgba(0,212,255,0.5); outline-offset: 2px; }
+  #gLightbox { animation: lbFadeIn 0.15s ease; }
+  @keyframes lbFadeIn { from { opacity:0 } to { opacity:1 } }
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center gap-3 mb-4">
+  <div class="icon-box icon-purple" style="width:44px;height:44px;font-size:18px"><i class="fas fa-chart-bar"></i></div>
+  <div>
+    <h4 style="margin:0;font-weight:700;font-size:1.2rem">Analytics Dashboard</h4>
+    <div style="color:var(--muted);font-size:12.5px">Training metrics · Model performance · Visualization</div>
+  </div>
+</div>
+
+<!-- ── Stats ──────────────────────────────────── -->
+<div class="stat-row mb-4">
+  <div class="stat-box"><div class="stat-val">{{ ml_acc }}%</div><div class="stat-lbl">ML Accuracy</div></div>
+  <div class="stat-box"><div class="stat-val" style="color:var(--cyan)">{{ ml_auc }}%</div><div class="stat-lbl">ROC AUC</div></div>
+  <div class="stat-box">
+    {% if cnn_acc %}
+    <div class="stat-val" style="color:var(--green)">{{ cnn_acc }}%</div>
+    {% else %}
+    <div class="stat-val" style="color:var(--muted);font-size:1.2rem">N/A</div>
+    {% endif %}
+    <div class="stat-lbl">CNN Accuracy</div>
+  </div>
+  <div class="stat-box"><div class="stat-val" style="color:var(--amber)">3</div><div class="stat-lbl">Ensemble Models</div></div>
+  <div class="stat-box"><div class="stat-val" style="color:var(--violet)">4</div><div class="stat-lbl">MRI Classes</div></div>
+</div>
+
+<!-- ── Model status ───────────────────────────── -->
+<div class="card-dark mb-4">
+  <div class="card-header-dark">
+    <div class="icon-box icon-green" style="width:30px;height:30px;font-size:12px"><i class="fas fa-server"></i></div>
+    <h6>Model Status</h6>
+  </div>
+  <div class="card-body-dark" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
+    <span class="pill pill-green"><i class="fas fa-circle" style="font-size:7px"></i> ML Ensemble · {{ ml_acc }}% acc</span>
+    {% if cnn_model_ready %}
+    <span class="pill pill-green"><i class="fas fa-circle" style="font-size:7px"></i> CNN Model · {{ cnn_acc }}% acc</span>
+    {% elif cnn_acc %}
+    <span class="pill pill-amber"><i class="fas fa-triangle-exclamation" style="font-size:9px"></i> CNN Artifacts Only · cnn_model.keras needed</span>
+    {% else %}
+    <span class="pill pill-gray"><i class="fas fa-xmark" style="font-size:9px"></i> CNN Not Trained</span>
+    {% endif %}
+    <span class="pill pill-purple" style="font-size:10px"><i class="fas fa-water-ladder"></i> SHAP Ready</span>
+    {% if cnn_model_ready %}
+    <span class="pill pill-red" style="font-size:10px"><i class="fas fa-fire"></i> Grad-CAM Ready</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Ensemble table ─────────────────────────── -->
+{% if ensemble_stats %}
+<div class="card-dark mb-4">
+  <div class="card-header-dark">
+    <div class="icon-box icon-blue" style="width:30px;height:30px;font-size:12px"><i class="fas fa-list-check"></i></div>
+    <h6>Ensemble Model Performance Comparison</h6>
+  </div>
+  <div class="card-body-dark" style="padding:0">
+    <table class="tbl">
+      <thead><tr>
+        <th>Model</th><th>Test Accuracy</th><th>ROC AUC</th><th>CV Accuracy (5-fold)</th><th>Role</th>
+      </tr></thead>
+      <tbody>
+        {% set model_colors = {'Random Forest':'pill-green','Gradient Boosting':'pill-purple','SVM':'pill-blue'} %}
+        {% set model_roles  = {'Random Forest':'Primary / SHAP source','Gradient Boosting':'Best CV accuracy','SVM':'Linear decision boundary'} %}
+        {% for m in ensemble_stats %}
+        <tr>
+          <td><span class="pill {{ model_colors.get(m.name,'pill-gray') }}">{{ m.name }}</span></td>
+          <td><strong style="color:var(--text)">{{ m.acc }}%</strong>
+            <div class="prog-track mt-1" style="height:4px"><div class="prog-fill prog-green" style="width:{{ m.acc }}%"></div></div>
+          </td>
+          <td><strong style="color:var(--cyan)">{{ m.auc }}%</strong></td>
+          <td><strong style="color:var(--violet)">{{ m.cv }}%</strong></td>
+          <td style="color:var(--muted);font-size:12px">{{ model_roles.get(m.name,'') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── ML Graphs ──────────────────────────────── -->
+{% if ml_graphs %}
+<div class="card-dark mb-4">
+  <div class="card-header-dark">
+    <div class="icon-box icon-purple" style="width:30px;height:30px;font-size:12px"><i class="fas fa-table-list"></i></div>
+    <h6>Machine Learning — Clinical Analysis Graphs</h6>
+    <span class="pill pill-gray ms-auto" style="font-size:10px">{{ ml_graphs|length }} charts</span>
+  </div>
+  <div class="card-body-dark">
+    <div class="row g-3">
+      {% for g in ml_graphs %}
+      <div class="col-md-6">
+        <div class="graph-card"
+             style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:0.75rem;transition:all 0.2s;cursor:pointer;outline:none"
+             tabindex="0" role="button"
+             data-src="{{ url_for('static', filename='graphs/' + g.file) }}"
+             data-title="{{ g.title }}">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <i class="fas fa-magnifying-glass" style="color:var(--violet);font-size:11px"></i>
+            <div style="font-weight:600;font-size:12.5px;color:var(--text)">{{ g.title }}</div>
+          </div>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:0.6rem">{{ g.desc }}</div>
+          <div style="position:relative;overflow:hidden;border-radius:6px">
+            <img src="{{ url_for('static', filename='graphs/' + g.file) }}" alt="{{ g.title }}"
+                 style="width:100%;display:block" class="graph-thumb">
+            <div class="graph-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);opacity:0;transition:opacity 0.2s;display:flex;align-items:center;justify-content:center">
+              <span style="background:rgba(0,0,0,0.8);color:var(--cyan);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600"><i class="fas fa-expand me-1"></i>View Full</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-warning d-flex gap-2 mb-4">
+  <i class="fas fa-triangle-exclamation mt-1"></i>
+  <span>ML graphs not found. Run <code>python train_ml.py</code> to generate them.</span>
+</div>
+{% endif %}
+
+<!-- ── CNN Graphs ─────────────────────────────── -->
+{% if cnn_graphs %}
+<div class="card-dark mb-4">
+  <div class="card-header-dark">
+    <div class="icon-box icon-blue" style="width:30px;height:30px;font-size:12px"><i class="fas fa-brain"></i></div>
+    <h6>CNN Deep Learning — MRI Analysis Graphs</h6>
+    <span class="pill pill-gray ms-auto" style="font-size:10px">{{ cnn_graphs|length }} charts</span>
+  </div>
+  <div class="card-body-dark">
+    <div class="row g-3">
+      {% for g in cnn_graphs %}
+      <div class="col-md-6">
+        <div class="graph-card"
+             style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:0.75rem;transition:all 0.2s;cursor:pointer;outline:none"
+             tabindex="0" role="button"
+             data-src="{{ url_for('static', filename='graphs/' + g.file) }}"
+             data-title="{{ g.title }}">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <i class="fas fa-magnifying-glass" style="color:var(--cyan);font-size:11px"></i>
+            <div style="font-weight:600;font-size:12.5px;color:var(--text)">{{ g.title }}</div>
+          </div>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:0.6rem">{{ g.desc }}</div>
+          <div style="position:relative;overflow:hidden;border-radius:6px">
+            <img src="{{ url_for('static', filename='graphs/' + g.file) }}" alt="{{ g.title }}"
+                 style="width:100%;display:block" class="graph-thumb">
+            <div class="graph-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);opacity:0;transition:opacity 0.2s;display:flex;align-items:center;justify-content:center">
+              <span style="background:rgba(0,0,0,0.8);color:var(--cyan);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600"><i class="fas fa-expand me-1"></i>View Full</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info d-flex gap-2 mb-4">
+  <i class="fas fa-circle-info mt-1"></i>
+  <span>CNN graphs not found. Run <code>python train_cnn.py</code> to generate them.</span>
+</div>
+{% endif %}
+
+<!-- Lightbox — pure CSS/JS, no Bootstrap modal, no scroll-lock conflicts -->
+<div id="gLightbox" style="
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,0.88); backdrop-filter:blur(6px);
+  align-items:center; justify-content:center; flex-direction:column; gap:0.75rem;
+  padding:1.5rem;">
+  <div style="
+    background:var(--bg2); border:1px solid var(--border2); border-radius:14px;
+    max-width:1100px; width:100%; overflow:hidden; position:relative;">
+    <!-- Header -->
+    <div style="
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0.85rem 1.25rem; border-bottom:1px solid var(--border);
+      background:rgba(0,212,255,0.03);">
+      <span id="lbTitle" style="font-weight:700; font-size:14px; color:var(--text)"></span>
+      <button id="lbClose" style="
+        background:var(--bg4); border:1px solid var(--border); border-radius:8px;
+        color:var(--muted); width:32px; height:32px; cursor:pointer; font-size:14px;
+        display:flex; align-items:center; justify-content:center; transition:all 0.15s;"
+        onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+    <!-- Image -->
+    <div style="padding:1rem; background:var(--bg3); text-align:center;">
+      <img id="lbImg" src="" alt="" style="max-width:100%; max-height:75vh; object-fit:contain; border-radius:8px; display:block; margin:0 auto;">
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const lb    = document.getElementById('gLightbox');
+  const lbImg = document.getElementById('lbImg');
+  const lbTtl = document.getElementById('lbTitle');
+  const lbBtn = document.getElementById('lbClose');
+
+  function openLightbox(src, title) {
+    lbImg.src = '';
+    lbTtl.textContent = title || '';
+    lb.style.display = 'flex';
+    document.body.style.overflow = 'hidden';   // lock scroll
+    // load image after display so browser renders correctly
+    setTimeout(() => { lbImg.src = src || ''; }, 10);
+  }
+
+  function closeLightbox() {
+    lb.style.display = 'none';
+    lbImg.src = '';
+    document.body.style.overflow = '';         // always restore
+  }
+
+  // Close button
+  lbBtn.addEventListener('click', closeLightbox);
+
+  // Click backdrop (outside the inner box) to close
+  lb.addEventListener('click', function (e) {
+    if (e.target === lb) closeLightbox();
+  });
+
+  // Escape key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && lb.style.display === 'flex') closeLightbox();
+  });
+
+  // Click on any graph card (delegated, catches child clicks too)
+  document.addEventListener('click', function (e) {
+    const card = e.target.closest('.graph-card');
+    if (!card) return;
+    const src   = card.getAttribute('data-src');
+    const title = card.getAttribute('data-title');
+    if (src) openLightbox(src, title);
+  });
+
+  // Keyboard open on focused card
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = document.activeElement && document.activeElement.closest
+      ? document.activeElement.closest('.graph-card')
+      : null;
+    if (!card) return;
+    e.preventDefault();
+    const src   = card.getAttribute('data-src');
+    const title = card.getAttribute('data-title');
+    if (src) openLightbox(src, title);
+  });
+
+  // Graph card hover effects
+  document.querySelectorAll('.graph-card').forEach(card => {
+    card.addEventListener('mouseenter', () => {
+      card.style.borderColor = 'var(--border2)';
+      card.style.boxShadow   = '0 0 20px rgba(0,212,255,0.1)';
+      card.style.transform   = 'translateY(-2px)';
+      const ov = card.querySelector('.graph-overlay');
+      if (ov) ov.style.opacity = '1';
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.borderColor = '';
+      card.style.boxShadow   = '';
+      card.style.transform   = '';
+      const ov = card.querySelector('.graph-overlay');
+      if (ov) ov.style.opacity = '0';
+    });
+    card.addEventListener('focus', () => { card.style.outline = '2px solid rgba(0,212,255,0.5)'; card.style.outlineOffset = '2px'; });
+    card.addEventListener('blur',  () => { card.style.outline = 'none'; });
+  });
+
+  // Progress bar animations
+  document.querySelectorAll('.prog-fill').forEach(b => {
+    const w = b.style.width; b.style.width = '0';
+    setTimeout(() => { b.style.transition = 'width 0.9s ease'; b.style.width = w; }, 200);
+  });
+})();
+</script>
+{% endblock %}

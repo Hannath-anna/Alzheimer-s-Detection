@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}Combined Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+  .toggle-group { display:flex; gap:8px; }
+  .toggle-btn {
+    flex:1; padding:.45rem; border-radius:8px; font-size:12px; font-weight:600;
+    border:1px solid var(--border); background:var(--bg3); color:var(--muted);
+    cursor:pointer; transition:all .2s; text-align:center;
+  }
+  .toggle-btn.selected-no  { border-color:var(--green); background:rgba(16,185,129,0.12); color:var(--green); }
+  .toggle-btn.selected-yes { border-color:var(--red);   background:rgba(239,68,68,0.12);  color:var(--red); }
+  .upload-zone {
+    border:2px dashed var(--border); border-radius:14px; padding:1.5rem;
+    text-align:center; cursor:pointer; transition:border-color .2s, background .2s;
+    min-height:160px; display:flex; align-items:center; justify-content:center;
+  }
+  .upload-zone:hover { border-color:var(--cyan); background:rgba(0,212,255,0.03); }
+  .bio-section-title {
+    font-size:10.5px; font-weight:700; text-transform:uppercase;
+    letter-spacing:1px; color:var(--muted2);
+    margin:1rem 0 .65rem; display:flex; align-items:center; gap:8px;
+  }
+  .bio-section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+  .form-progress { height:3px; background:var(--bg4); position:fixed; top:70px; left:0; right:0; z-index:999; }
+  .form-progress-fill { height:100%; background:linear-gradient(90deg,var(--violet),var(--cyan)); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-progress"><div class="form-progress-fill" style="width:100%"></div></div>
+
+<div style="max-width:1100px;margin:0 auto">
+
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <div class="icon-box icon-violet" style="width:52px;height:52px;font-size:22px">
+      <i class="fas fa-layer-group"></i>
+    </div>
+    <div>
+      <h4 style="margin:0;font-family:'Outfit',sans-serif;font-weight:800;font-size:1.4rem">Combined Analysis</h4>
+      <div style="color:var(--muted);font-size:12.5px">Clinical ML Ensemble (33 features) + MRI CNN — single unified diagnosis</div>
+    </div>
+    <div class="ms-auto d-flex gap-2 flex-wrap">
+      <span class="pill pill-{{ 'green' if ml_ready else 'amber' }}" style="font-size:10px">
+        <i class="fas fa-table-list" style="font-size:8px"></i> ML {% if ml_ready %}Ready{% else %}Not Loaded{% endif %}
+      </span>
+      <span class="pill pill-{{ 'green' if cnn_ready else 'amber' }}" style="font-size:10px">
+        <i class="fas fa-brain" style="font-size:8px"></i> CNN {% if cnn_ready %}Ready{% else %}Not Loaded{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <form action="{{ url_for('combined_predict') }}" method="POST" enctype="multipart/form-data" id="combinedForm">
+    <div class="row g-4">
+
+      <!-- LEFT: MRI Upload -->
+      <div class="col-lg-4">
+        <div class="card-glass" style="position:sticky;top:90px">
+          <div class="card-glass-header">
+            <div class="icon-box icon-cyan" style="width:32px;height:32px;font-size:13px"><i class="fas fa-brain"></i></div>
+            <div>
+              <h6 class="mb-0">MRI Brain Scan</h6>
+              <div style="font-size:11px;color:var(--muted)">EfficientNetB0 · 4-class staging</div>
+            </div>
+          </div>
+          <div class="card-glass-body">
+            <div class="upload-zone" id="dropZone" onclick="document.getElementById('mri_file').click()">
+              <div id="upload-prompt" style="width:100%">
+                <i class="fas fa-brain" style="font-size:2rem;color:var(--cyan);margin-bottom:.65rem;display:block"></i>
+                <div style="font-weight:700;color:var(--text);font-family:'Outfit',sans-serif;margin-bottom:4px">Drop MRI image here</div>
+                <div style="color:var(--muted);font-size:12px">or click to browse</div>
+                <div style="display:inline-block;margin-top:8px;padding:3px 12px;background:var(--bg3);border-radius:99px;font-size:11px;color:var(--muted2)">
+                  PNG · JPG · JPEG · BMP · TIFF
+                </div>
+              </div>
+              <div id="preview-wrap" style="display:none;width:100%">
+                <img id="preview-img" src="" alt="Preview"
+                     style="max-height:180px;border-radius:8px;max-width:100%;object-fit:contain;border:1px solid var(--border2)">
+                <div id="preview-name" style="margin-top:6px;font-size:11px;color:var(--cyan);font-family:'JetBrains Mono',monospace;word-break:break-all"></div>
+                <button type="button" onclick="clearPreview(event)"
+                        style="margin-top:6px;background:var(--red-dim);border:1px solid rgba(239,68,68,.3);color:var(--red);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer">
+                  <i class="fas fa-times"></i> Remove
+                </button>
+              </div>
+            </div>
+            <input type="file" name="mri_image" id="mri_file" accept="image/*" class="d-none" onchange="previewImage(event)">
+
+            <div style="margin-top:.85rem;padding:10px 12px;background:var(--bg4);border:1px solid var(--border);border-radius:10px;font-size:11.5px">
+              <div style="font-weight:700;color:var(--muted);margin-bottom:5px;font-size:10px;text-transform:uppercase;letter-spacing:.8px">CNN Detects</div>
+              <div class="d-flex flex-column gap-1" style="color:var(--muted2)">
+                <span><i class="fas fa-circle" style="font-size:7px;color:var(--green)"></i>&nbsp;Non Dementia</span>
+                <span><i class="fas fa-circle" style="font-size:7px;color:var(--cyan)"></i>&nbsp;Very Mild Dementia</span>
+                <span><i class="fas fa-circle" style="font-size:7px;color:var(--amber)"></i>&nbsp;Mild Dementia</span>
+                <span><i class="fas fa-circle" style="font-size:7px;color:var(--red)"></i>&nbsp;Moderate Dementia</span>
+              </div>
+            </div>
+
+            <div style="margin-top:.75rem;padding:10px 12px;background:var(--bg4);border:1px solid var(--border);border-radius:10px">
+              <div style="font-weight:700;color:var(--muted);margin-bottom:6px;font-size:10px;text-transform:uppercase;letter-spacing:.8px">Fusion Weights</div>
+              <div style="display:flex;gap:8px">
+                <div style="flex:2;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);border-radius:8px;padding:5px 8px;text-align:center">
+                  <div style="color:var(--violet);font-weight:800;font-size:13px">40%</div>
+                  <div style="color:var(--muted2);font-size:10px">Clinical ML</div>
+                </div>
+                <div style="flex:3;background:rgba(0,212,255,0.10);border:1px solid rgba(0,212,255,0.3);border-radius:8px;padding:5px 8px;text-align:center">
+                  <div style="color:var(--cyan);font-weight:800;font-size:13px">60%</div>
+                  <div style="color:var(--muted2);font-size:10px">MRI CNN</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: All 33 Clinical Biomarkers -->
+      <div class="col-lg-8">
+        <div class="card-glass">
+          <div class="card-glass-header">
+            <div class="icon-box icon-violet" style="width:32px;height:32px;font-size:13px"><i class="fas fa-table-list"></i></div>
+            <div>
+              <h6 class="mb-0">Clinical Biomarkers</h6>
+              <div style="font-size:11px;color:var(--muted)">RF + Gradient Boosting + SVM · 33 features</div>
+            </div>
+            <div class="ms-auto d-flex gap-1 flex-wrap">
+              <span class="pill pill-violet" style="font-size:10px">Random Forest</span>
+              <span class="pill pill-cyan"   style="font-size:10px">Grad. Boosting</span>
+              <span class="pill pill-gray"   style="font-size:10px">SVM</span>
+            </div>
+          </div>
+          <div class="card-glass-body">
+
+            <!-- 1. Demographics -->
+            <div class="bio-section-title">
+              <i class="fas fa-user" style="color:var(--violet)"></i> Demographics
+            </div>
+            <div class="row g-2 mb-1">
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Age</label>
+                <input type="number" name="Age" class="form-control form-control-sm" min="18" max="120" placeholder="72">
+                <div style="font-size:10px;color:var(--muted2);margin-top:2px">18–120 years</div>
+              </div>
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Gender</label>
+                <select name="Gender" class="form-select form-select-sm">
+                  <option value="0">Female</option>
+                  <option value="1">Male</option>
+                </select>
+              </div>
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Ethnicity</label>
+                <select name="Ethnicity" class="form-select form-select-sm">
+                  <option value="0">Caucasian</option>
+                  <option value="1">African American</option>
+                  <option value="2">Asian</option>
+                  <option value="3">Other</option>
+                </select>
+              </div>
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Education Level</label>
+                <select name="EducationLevel" class="form-select form-select-sm">
+                  <option value="0">None</option>
+                  <option value="1">High School</option>
+                  <option value="2">Bachelor's</option>
+                  <option value="3">Higher Degree</option>
+                </select>
+              </div>
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">BMI</label>
+                <input type="number" name="BMI" class="form-control form-control-sm" step="0.1" min="10" max="60" placeholder="25.4">
+              </div>
+            </div>
+
+            <!-- 2. Cognitive & Functional -->
+            <div class="bio-section-title">
+              <i class="fas fa-brain" style="color:var(--red)"></i> Cognitive &amp; Functional
+              <span class="pill pill-red" style="font-size:9px;padding:2px 7px"><i class="fas fa-fire" style="font-size:8px"></i> High Impact</span>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">MMSE Score <span style="font-weight:400">(0–30)</span></label>
+                <input type="number" name="MMSE" class="form-control form-control-sm" step="0.1" min="0" max="30" placeholder="24.5">
+                <div style="font-size:10px;color:var(--muted2);margin-top:2px">Mini-Mental State Exam</div>
+              </div>
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Functional Assessment <span style="font-weight:400">(0–10)</span></label>
+                <input type="number" name="FunctionalAssessment" class="form-control form-control-sm" step="0.1" min="0" max="10" placeholder="7.2">
+              </div>
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">ADL Score <span style="font-weight:400">(0–10)</span></label>
+                <input type="number" name="ADL" class="form-control form-control-sm" step="0.1" min="0" max="10" placeholder="6.0">
+                <div style="font-size:10px;color:var(--muted2);margin-top:2px">Activities of Daily Living</div>
+              </div>
+            </div>
+
+            <div style="font-size:10.5px;color:var(--muted2);margin-bottom:6px;font-weight:600">Behavioral Symptoms</div>
+            <div class="row g-2 mb-1">
+              {% for fname, flabel in [
+                ('MemoryComplaints','Memory Complaints'),
+                ('BehavioralProblems','Behavioral Problems'),
+                ('Confusion','Confusion'),
+                ('Disorientation','Disorientation'),
+                ('PersonalityChanges','Personality Changes'),
+                ('DifficultyCompletingTasks','Difficulty Completing Tasks'),
+                ('Forgetfulness','Forgetfulness')
+              ] %}
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:4px;display:block">{{ flabel }}</label>
+                <div class="toggle-group">
+                  <div class="toggle-btn selected-no" onclick="setToggle('{{ fname }}', 0, this)">No</div>
+                  <div class="toggle-btn" onclick="setToggle('{{ fname }}', 1, this)">Yes</div>
+                </div>
+                <input type="hidden" name="{{ fname }}" id="val-{{ fname }}" value="0">
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- 3. Lifestyle -->
+            <div class="bio-section-title">
+              <i class="fas fa-dumbbell" style="color:var(--green)"></i> Lifestyle Factors
+            </div>
+            <div class="row g-2 mb-1">
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Smoking</label>
+                <select name="Smoking" class="form-select form-select-sm">
+                  <option value="0">Non-Smoker</option>
+                  <option value="1">Smoker</option>
+                </select>
+              </div>
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Alcohol <span style="font-weight:400">(units/wk)</span></label>
+                <input type="number" name="AlcoholConsumption" class="form-control form-control-sm" step="0.1" min="0" max="30" placeholder="5.0">
+              </div>
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Physical Activity <span style="font-weight:400">(hrs/wk)</span></label>
+                <input type="number" name="PhysicalActivity" class="form-control form-control-sm" step="0.1" min="0" max="20" placeholder="4.5">
+              </div>
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Diet Quality <span style="font-weight:400">(0–10)</span></label>
+                <input type="number" name="DietQuality" class="form-control form-control-sm" step="0.1" min="0" max="10" placeholder="6.5">
+              </div>
+              <div class="col-sm-3">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Sleep Quality <span style="font-weight:400">(0–10)</span></label>
+                <input type="number" name="SleepQuality" class="form-control form-control-sm" step="0.1" min="0" max="10" placeholder="7.0">
+              </div>
+            </div>
+
+            <!-- 4. Medical History -->
+            <div class="bio-section-title">
+              <i class="fas fa-file-medical" style="color:var(--amber)"></i> Medical History
+            </div>
+            <div class="row g-2 mb-1">
+              {% for fname, flabel in [
+                ('FamilyHistoryAlzheimers', "Family History of Alzheimer's"),
+                ('CardiovascularDisease',   'Cardiovascular Disease'),
+                ('Diabetes',                'Diabetes'),
+                ('Depression',              'Depression'),
+                ('HeadInjury',              'Head Injury'),
+                ('Hypertension',            'Hypertension')
+              ] %}
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:4px;display:block">{{ flabel }}</label>
+                <div class="toggle-group">
+                  <div class="toggle-btn selected-no" onclick="setToggle('{{ fname }}', 0, this)">No</div>
+                  <div class="toggle-btn" onclick="setToggle('{{ fname }}', 1, this)">Yes</div>
+                </div>
+                <input type="hidden" name="{{ fname }}" id="val-{{ fname }}" value="0">
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- 5. Vitals & Blood Tests -->
+            <div class="bio-section-title">
+              <i class="fas fa-heart-pulse" style="color:var(--red)"></i> Vitals &amp; Blood Tests
+            </div>
+            <div class="row g-2 mb-1">
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Systolic BP <span style="font-weight:400">(mmHg)</span></label>
+                <input type="number" name="SystolicBP" class="form-control form-control-sm" min="80" max="200" placeholder="130">
+              </div>
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Diastolic BP <span style="font-weight:400">(mmHg)</span></label>
+                <input type="number" name="DiastolicBP" class="form-control form-control-sm" min="50" max="130" placeholder="85">
+              </div>
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Total Cholesterol <span style="font-weight:400">(mg/dL)</span></label>
+                <input type="number" name="CholesterolTotal" class="form-control form-control-sm" step="0.1" placeholder="220">
+              </div>
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">LDL Cholesterol</label>
+                <input type="number" name="CholesterolLDL" class="form-control form-control-sm" step="0.1" placeholder="130">
+              </div>
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">HDL Cholesterol</label>
+                <input type="number" name="CholesterolHDL" class="form-control form-control-sm" step="0.1" placeholder="55">
+              </div>
+              <div class="col-sm-4">
+                <label style="font-size:11px;color:var(--muted2);margin-bottom:3px;display:block">Triglycerides</label>
+                <input type="number" name="CholesterolTriglycerides" class="form-control form-control-sm" step="0.1" placeholder="180">
+              </div>
+            </div>
+
+            <!-- Submit -->
+            <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border);
+                        display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+              <div style="font-size:12px;color:var(--muted2)">
+                <i class="fas fa-info-circle me-1"></i> Leave unknown fields blank — they default to 0.
+              </div>
+              <div class="d-flex gap-2">
+                <button type="reset" class="btn-ghost d-flex align-items-center gap-2" style="font-size:13px">
+                  <i class="fas fa-rotate-left"></i> Reset
+                </button>
+                <button type="submit" id="submitBtn" class="btn-violet d-flex align-items-center gap-2"
+                        style="font-size:14px;padding:.65rem 1.75rem">
+                  <i class="fas fa-play"></i> Run Combined Analysis
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+function previewImage(e) {
+  const file = e.target.files[0]; if (!file) return;
+  document.getElementById('upload-prompt').style.display = 'none';
+  document.getElementById('preview-wrap').style.display  = 'block';
+  document.getElementById('preview-img').src = URL.createObjectURL(file);
+  document.getElementById('preview-name').textContent = file.name;
+}
+function clearPreview(e) {
+  e.stopPropagation();
+  document.getElementById('mri_file').value = '';
+  document.getElementById('preview-wrap').style.display  = 'none';
+  document.getElementById('upload-prompt').style.display = 'block';
+}
+function setToggle(name, val, btn) {
+  btn.parentElement.querySelectorAll('.toggle-btn')
+     .forEach(b => b.classList.remove('selected-no','selected-yes'));
+  btn.classList.add(val === 0 ? 'selected-no' : 'selected-yes');
+  document.getElementById('val-' + name).value = val;
+}
+document.getElementById('combinedForm').addEventListener('submit', function() {
+  const btn = document.getElementById('submitBtn');
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analysing…';
+  btn.style.opacity = '.7'; btn.disabled = true;
+});
+</script>
+{% endblock %}

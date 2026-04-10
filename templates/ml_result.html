@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Analysis Result{% endblock %}
+{% block content %}
+
+<div style="max-width:900px;margin:0 auto">
+
+  <!-- ── Verdict banner ──────────────────────── -->
+  <div class="result-banner {{ final_badge }} mb-4">
+    <div class="banner-icon">
+      <i class="fas {% if final_vote==1 %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+    </div>
+    <div class="flex-grow-1">
+      <div class="banner-title">{{ final_label }}</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:4px">
+        {{ vote_count }}/{{ total_models }} models agree
+        &nbsp;·&nbsp;
+        P(Alzheimer) = <strong style="color:var(--text)">{{ avg_prob_pos }}%</strong>
+        &nbsp;·&nbsp;
+        P(No Alzheimer) = <strong style="color:var(--text)">{{ avg_prob_neg }}%</strong>
+        &nbsp;·&nbsp;
+        <span class="pill pill-{% if risk_lvl=='high' %}red{% elif risk_lvl=='medium' %}amber{% else %}green{% endif %}" style="font-size:11px">{{ risk }}</span>
+      </div>
+    </div>
+    <div class="text-end">
+      {% if final_vote == 1 %}
+        <div style="font-size:2rem;font-weight:800;color:var(--red)">{{ avg_prob_pos }}%</div>
+        <div style="font-size:11px;color:var(--muted)">Alzheimer probability</div>
+      {% else %}
+        <div style="font-size:2rem;font-weight:800;color:var(--green)">{{ avg_prob_neg }}%</div>
+        <div style="font-size:11px;color:var(--muted)">No Alzheimer confidence</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Ensemble model cards ────────────────── -->
+  <div class="card-dark mb-4">
+    <div class="card-header-dark">
+      <div class="icon-box icon-blue"><i class="fas fa-list-check"></i></div>
+      <h6>Ensemble Voting — Individual Model Results</h6>
+      <span class="pill {% if vote_count == total_models %}pill-green{% else %}pill-amber{% endif %} ms-auto">
+        {% if vote_count == total_models %}
+          <i class="fas fa-circle-check" style="font-size:9px"></i> Unanimous {{ vote_count }}/{{ total_models }}
+        {% else %}
+          <i class="fas fa-triangle-exclamation" style="font-size:9px"></i> Majority {{ vote_count }}/{{ total_models }}
+        {% endif %}
+      </span>
+    </div>
+    <div class="card-body-dark">
+      <div class="row g-3">
+        {% set model_icons = {'Random Forest':'fa-tree','Gradient Boosting':'fa-chart-line','SVM':'fa-vector-square'} %}
+        {% set model_colors = {'Random Forest':'icon-green','Gradient Boosting':'icon-purple','SVM':'icon-blue'} %}
+        {% for r in model_results %}
+        <div class="col-md-4">
+          {# Minority model = voted against final verdict #}
+          {% set is_minority = (r.prediction != final_vote) %}
+          <div class="vote-card {% if r.prediction==1 %}alzheimer{% else %}healthy{% endif %}"
+               style="{% if is_minority %}opacity:0.65;filter:saturate(0.5){% endif %}">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="icon-box {{ model_colors.get(r.name,'icon-gray') }}" style="width:30px;height:30px;font-size:12px">
+                <i class="fas {{ model_icons.get(r.name,'fa-robot') }}"></i>
+              </div>
+              <span style="font-weight:600;font-size:12.5px">{{ r.name }}</span>
+              <span class="pill {% if r.prediction==1 %}pill-red{% else %}pill-green{% endif %} ms-auto" style="font-size:10px">
+                {% if r.prediction==1 %}Alz{% else %}No Alz{% endif %}
+              </span>
+            </div>
+            {% if is_minority %}
+            <div style="font-size:10px;color:var(--amber);margin-bottom:6px;display:flex;align-items:center;gap:4px">
+              <i class="fas fa-triangle-exclamation" style="font-size:9px"></i> Minority vote
+            </div>
+            {% endif %}
+            <div style="font-weight:700;font-size:1.1rem;color:{% if r.prediction==1 %}var(--red){% else %}var(--green){% endif %};margin-bottom:6px">
+              {{ r.label }}
+            </div>
+            <!-- Probability bars — one per outcome, always correctly colored -->
+            <div style="margin-bottom:0.75rem">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+                <span style="color:var(--green);display:flex;align-items:center;gap:4px">
+                  <i class="fas fa-circle" style="font-size:6px"></i> No Alzheimer
+                </span>
+                <span style="color:var(--green);font-weight:700">{{ r.prob_neg }}%</span>
+              </div>
+              <div class="prog-track mb-2">
+                <div class="prog-fill prog-green" style="width:{{ r.prob_neg }}%"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+                <span style="color:var(--red);display:flex;align-items:center;gap:4px">
+                  <i class="fas fa-circle" style="font-size:6px"></i> Alzheimer
+                </span>
+                <span style="color:var(--red);font-weight:700">{{ r.prob_pos }}%</span>
+              </div>
+              <div class="prog-track">
+                <div class="prog-fill prog-red" style="width:{{ r.prob_pos }}%"></div>
+              </div>
+            </div>
+            <div class="sep" style="margin:0 0 0.6rem 0"></div>
+            <div style="display:flex;gap:1rem;font-size:11px;color:var(--muted)">
+              <span>Acc <strong style="color:var(--text)">{{ r.test_acc }}%</strong></span>
+              <span>AUC <strong style="color:var(--text)">{{ r.auc }}%</strong></span>
+              <span>Conf <strong style="color:var(--text)">{{ r.confidence }}%</strong></span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Average probability bars -->
+      <div class="sep"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+        <div class="icon-box icon-cyan" style="width:28px;height:28px;font-size:11px"><i class="fas fa-chart-bar"></i></div>
+        <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px">Ensemble Average Probability</span>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div style="background:var(--bg4);border:1px solid rgba(16,185,129,0.2);border-radius:12px;padding:1rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="color:var(--green);font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+                <i class="fas fa-circle-check"></i> No Alzheimer
+              </span>
+              <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:1.4rem;color:var(--green)">{{ avg_prob_neg }}%</span>
+            </div>
+            <div class="prog-track"><div class="prog-fill prog-green" style="width:{{ avg_prob_neg }}%"></div></div>
+            <div style="font-size:11px;color:var(--muted2);margin-top:6px">Probability of no Alzheimer's across all models</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div style="background:var(--bg4);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:1rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="color:var(--red);font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+                <i class="fas fa-triangle-exclamation"></i> Alzheimer
+              </span>
+              <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:1.4rem;color:var(--red)">{{ avg_prob_pos }}%</span>
+            </div>
+            <div class="prog-track"><div class="prog-fill prog-red" style="width:{{ avg_prob_pos }}%"></div></div>
+            <div style="font-size:11px;color:var(--muted2);margin-top:6px">Probability of Alzheimer's across all models</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SHAP Waterfall ──────────────────────── -->
+  {% if shap_chart %}
+  <div class="card-dark mb-4">
+    <div class="card-header-dark">
+      <div class="icon-box icon-purple"><i class="fas fa-water-ladder"></i></div>
+      <div>
+        <h6>SHAP Explainability — Why This Prediction?</h6>
+        <div style="font-size:11px;color:var(--muted)">Manual TreeSHAP · Random Forest · Top 12 features</div>
+      </div>
+      <div class="ms-auto d-flex gap-2">
+        <span class="pill pill-red"><span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span> ↑ Raises risk</span>
+        <span class="pill pill-green"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span> ↓ Lowers risk</span>
+      </div>
+    </div>
+    <div class="card-body-dark" style="padding:0">
+      <img src="data:image/png;base64,{{ shap_chart }}"
+           alt="SHAP Waterfall Chart"
+           style="width:100%;border-radius:0 0 12px 12px;display:block">
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Actions ────────────────────────────── -->
+  <div class="d-flex gap-2 flex-wrap mb-4">
+    <a href="{{ url_for('ml_form') }}"  class="btn-purple d-flex align-items-center gap-2" style="text-decoration:none"><i class="fas fa-redo"></i> New Analysis</a>
+    <a href="{{ url_for('cnn_form') }}" class="btn-green d-flex align-items-center gap-2" style="text-decoration:none"><i class="fas fa-brain"></i> MRI Scan</a>
+    <a href="{{ url_for('dashboard') }}" class="btn-outline d-flex align-items-center gap-2" style="text-decoration:none"><i class="fas fa-chart-bar"></i> Dashboard</a>
+    <a href="{{ url_for('index') }}"    class="btn-ghost d-flex align-items-center gap-2"  style="text-decoration:none"><i class="fas fa-home"></i> Home</a>
+  </div>
+
+  <div class="alert alert-warning d-flex gap-2 align-items-start">
+    <i class="fas fa-triangle-exclamation mt-1" style="flex-shrink:0"></i>
+    <span><strong>Disclaimer:</strong> AI-generated result for research purposes only. Consult a qualified neurologist for medical diagnosis.</span>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Animate progress bars on load
+  document.querySelectorAll('.prog-fill').forEach(bar => {
+    const w = bar.style.width;
+    bar.style.width = '0%';
+    setTimeout(() => bar.style.width = w, 100);
+  });
+</script>
+{% endblock %}

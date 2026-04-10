@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+{% block title %}Combined Analysis Result{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Final verdict banner ── */
+  .final-banner {
+    border-radius: 18px; padding: 1.75rem 2rem;
+    display: flex; align-items: center; gap: 1.5rem;
+    margin-bottom: 1.5rem; position: relative; overflow: hidden;
+  }
+  .final-banner.verdict-none   { background: rgba(16,185,129,0.10); border: 1.5px solid rgba(16,185,129,0.35); }
+  .final-banner.verdict-low    { background: rgba(0,212,255,0.08);  border: 1.5px solid rgba(0,212,255,0.35); }
+  .final-banner.verdict-medium { background: rgba(245,158,11,0.10); border: 1.5px solid rgba(245,158,11,0.35); }
+  .final-banner.verdict-high   { background: rgba(239,68,68,0.10);  border: 1.5px solid rgba(239,68,68,0.40); }
+
+  .verdict-icon-wrap {
+    width: 64px; height: 64px; border-radius: 16px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+  }
+  .verdict-none   .verdict-icon-wrap { background: rgba(16,185,129,0.15); color: var(--green); }
+  .verdict-low    .verdict-icon-wrap { background: rgba(0,212,255,0.15);  color: var(--cyan); }
+  .verdict-medium .verdict-icon-wrap { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .verdict-high   .verdict-icon-wrap { background: rgba(239,68,68,0.15);  color: var(--red); }
+
+  .verdict-title {
+    font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 1.5rem; line-height: 1.2;
+  }
+  .verdict-none   .verdict-title { color: var(--green); }
+  .verdict-low    .verdict-title { color: var(--cyan); }
+  .verdict-medium .verdict-title { color: var(--amber); }
+  .verdict-high   .verdict-title { color: var(--red); }
+
+  /* ── Fusion meter ── */
+  .fusion-track {
+    height: 14px; border-radius: 99px;
+    background: linear-gradient(90deg,
+      rgba(16,185,129,0.25) 0%,
+      rgba(0,212,255,0.25) 30%,
+      rgba(245,158,11,0.25) 60%,
+      rgba(239,68,68,0.25) 100%);
+    position: relative; overflow: visible;
+  }
+  .fusion-marker {
+    position: absolute; top: -4px;
+    width: 4px; height: 22px; border-radius: 2px;
+    background: #fff; box-shadow: 0 0 8px rgba(255,255,255,.5);
+    transition: left 1.2s cubic-bezier(.4,0,.2,1);
+  }
+  .fusion-zones {
+    display: flex; height: 14px; border-radius: 99px; overflow: hidden;
+  }
+  .fz-none   { flex: 1; background: rgba(16,185,129,0.45); }
+  .fz-low    { flex: 1; background: rgba(0,212,255,0.45); }
+  .fz-medium { flex: 1; background: rgba(245,158,11,0.45); }
+  .fz-high   { flex: 1; background: rgba(239,68,68,0.45); }
+
+  /* ── Agreement badge ── */
+  .agree-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 99px;
+    font-size: 11.5px; font-weight: 700;
+  }
+  .agree-full     { background:rgba(16,185,129,0.15); color:var(--green); border:1px solid rgba(16,185,129,0.3); }
+  .agree-partial  { background:rgba(245,158,11,0.15); color:var(--amber); border:1px solid rgba(245,158,11,0.3); }
+  .agree-conflict { background:rgba(239,68,68,0.12);  color:var(--red);   border:1px solid rgba(239,68,68,0.3); }
+
+  /* ── Source pill ── */
+  .src-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:960px;margin:0 auto">
+
+  {% if errors %}
+  <div class="alert alert-danger mb-3">
+    <strong>Errors:</strong>
+    <ul class="mb-0 mt-1">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <!-- ══════════════════════════════════════════
+       FINAL CONCLUSION BANNER
+  ══════════════════════════════════════════ -->
+  <div class="final-banner verdict-{{ final.badge }}">
+    <div class="verdict-icon-wrap">
+      <i class="fas {{ final.icon }}"></i>
+    </div>
+    <div class="flex-grow-1">
+      <div class="verdict-title">{{ final.label }}</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:6px;
+                  display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span>Severity Score:
+          <strong style="color:var(--text)">{{ final.severity_score }}/3.0</strong>
+        </span>
+        <span>·</span>
+        <span>Alzheimer Risk:
+          <strong style="color:var(--text)">{{ final.combined_prob }}%</strong>
+        </span>
+
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted2)">
+        <span class="src-pill" style="background:rgba(139,92,246,0.12);color:var(--violet);border:1px solid rgba(139,92,246,0.25)">
+          <i class="fas fa-table-list" style="font-size:9px"></i> Clinical ML 40%
+        </span>
+        &nbsp;+&nbsp;
+        <span class="src-pill" style="background:rgba(0,212,255,0.10);color:var(--cyan);border:1px solid rgba(0,212,255,0.25)">
+          <i class="fas fa-brain" style="font-size:9px"></i> MRI CNN 60%
+        </span>
+        &nbsp;→&nbsp;
+        <span class="src-pill" style="background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border)">
+          <i class="fas fa-layer-group" style="font-size:9px"></i> Fused Verdict
+        </span>
+      </div>
+    </div>
+    <div class="text-end" style="flex-shrink:0">
+      <div style="font-size:2.4rem;font-weight:900;font-family:'Outfit',sans-serif;
+                  color:{% if final.badge=='none' %}var(--green){% elif final.badge=='low' %}var(--cyan){% elif final.badge=='medium' %}var(--amber){% else %}var(--red){% endif %}">
+        {{ final.combined_prob }}%
+      </div>
+      <div style="font-size:11px;color:var(--muted)">alzheimer risk</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       FUSION SEVERITY METER
+  ══════════════════════════════════════════ -->
+  <div class="card-dark mb-4">
+    <div class="card-header-dark">
+      <div class="icon-box icon-violet"><i class="fas fa-layer-group"></i></div>
+      <div>
+        <h6>Dual-Modality Fusion Score</h6>
+        <div style="font-size:11px;color:var(--muted)">
+          Weighted combination of Clinical ML (40%) + MRI CNN (60%)
+        </div>
+      </div>
+    </div>
+    <div class="card-body-dark">
+
+      <!-- Zone bar -->
+      <div style="margin-bottom:.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted2);margin-bottom:6px">
+          <span style="color:var(--green)">No Risk</span>
+          <span style="color:var(--cyan)">Very Mild</span>
+          <span style="color:var(--amber)">Mild</span>
+          <span style="color:var(--red)">Moderate</span>
+        </div>
+        <div class="fusion-track">
+          <div class="fusion-zones">
+            <div class="fz-none"></div>
+            <div class="fz-low"></div>
+            <div class="fz-medium"></div>
+            <div class="fz-high"></div>
+          </div>
+          <div class="fusion-marker" id="fusionMarker" style="left:0%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-top:4px">
+          <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+        </div>
+      </div>
+
+      <!-- Two source contribution bars -->
+      <div class="row g-3 mt-1">
+        {% if ml %}
+        <div class="col-md-6">
+          <div style="background:var(--bg4);border:1px solid rgba(139,92,246,0.2);
+                      border-radius:12px;padding:.9rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="color:var(--violet);font-size:12px;font-weight:700;
+                           display:flex;align-items:center;gap:5px">
+                <i class="fas fa-table-list" style="font-size:10px"></i> Clinical ML
+              </span>
+              <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:1.2rem;
+                           color:{% if ml.final_vote==1 %}var(--red){% else %}var(--green){% endif %}">
+                {{ ml.avg_prob_pos }}%
+              </span>
+            </div>
+            <div class="prog-track">
+              <div class="prog-fill {% if ml.final_vote==1 %}prog-red{% else %}prog-green{% endif %}"
+                   style="width:{{ ml.avg_prob_pos }}%"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:5px">
+              {{ ml.final_label }} · {{ ml.vote_count }}/{{ ml.total_models }} models
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        {% if cnn %}
+        <div class="col-md-6">
+          <div style="background:var(--bg4);border:1px solid rgba(0,212,255,0.2);
+                      border-radius:12px;padding:.9rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="color:var(--cyan);font-size:12px;font-weight:700;
+                           display:flex;align-items:center;gap:5px">
+                <i class="fas fa-brain" style="font-size:10px"></i> MRI CNN
+              </span>
+              <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:1.2rem;
+                           color:{% if cnn.badge=='none' %}var(--green){% elif cnn.badge=='low' %}var(--cyan){% elif cnn.badge=='medium' %}var(--amber){% else %}var(--red){% endif %}">
+                {{ cnn.confidence }}%
+              </span>
+            </div>
+            <div class="prog-track">
+              <div class="prog-fill
+                {% if cnn.badge=='none' %}prog-green
+                {% elif cnn.badge=='low' %}prog-cyan
+                {% elif cnn.badge=='medium' %}prog-yellow
+                {% else %}prog-red{% endif %}"
+                   style="width:{{ cnn.confidence }}%"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:5px">
+              {{ cnn.pred_class }} · {{ cnn.severity }}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       CLINICAL RECOMMENDATION
+  ══════════════════════════════════════════ -->
+  <div class="card-dark mb-4">
+    <div class="card-header-dark">
+      <div class="icon-box icon-yellow"><i class="fas fa-stethoscope"></i></div>
+      <h6>Clinical Recommendation</h6>
+      <span class="pill pill-{{ 'green' if final.badge=='none' else 'amber' if final.badge in ('low','medium') else 'red' }} ms-auto"
+            style="font-size:10px">{{ final.risk_label }}</span>
+    </div>
+    <div class="card-body-dark">
+
+      {% if final.badge == 'none' %}
+      <div class="alert alert-success d-flex gap-2 mb-3">
+        <i class="fas fa-circle-check mt-1" style="flex-shrink:0"></i>
+        <span>
+          <strong>No Alzheimer's Detected.</strong> Both clinical biomarkers and MRI imaging
+          show no significant signs of cognitive decline. Routine monitoring every 12–24 months
+          is recommended for patients over 65.
+        </span>
+      </div>
+      {% elif final.badge == 'low' %}
+      <div class="alert alert-info d-flex gap-2 mb-3">
+        <i class="fas fa-circle-info mt-1" style="flex-shrink:0"></i>
+        <span>
+          <strong>Very Mild Cognitive Impairment Suspected.</strong> Subtle indicators detected.
+          Early cognitive intervention, lifestyle modifications (exercise, diet, mental stimulation),
+          and a follow-up evaluation in 6–12 months is advised.
+        </span>
+      </div>
+      {% elif final.badge == 'medium' %}
+      <div class="alert alert-warning d-flex gap-2 mb-3">
+        <i class="fas fa-triangle-exclamation mt-1" style="flex-shrink:0"></i>
+        <span>
+          <strong>Mild Dementia Indicated.</strong> Noticeable cognitive impairment detected across
+          one or both modalities. Neurologist consultation, full cognitive battery testing, medication
+          evaluation, and caregiver support planning are strongly recommended.
+        </span>
+      </div>
+      {% else %}
+      <div class="alert alert-danger d-flex gap-2 mb-3">
+        <i class="fas fa-radiation mt-1" style="flex-shrink:0"></i>
+        <span>
+          <strong>Moderate Dementia Detected.</strong> Significant findings across both clinical and
+          imaging analysis. Immediate specialist referral, comprehensive care planning, safety
+          assessments, and family support coordination are urgently recommended.
+        </span>
+      </div>
+      {% endif %}
+
+      <!-- How conclusion was reached -->
+      <div style="background:var(--bg4);border:1px solid var(--border);border-radius:12px;
+                  padding:1rem 1.1rem;font-size:12.5px;color:var(--muted);line-height:1.85">
+        <strong style="color:var(--text)">How this conclusion was reached:</strong><br>
+        {% if ml %}
+        The Clinical ML ensemble (Random Forest + Gradient Boosting + SVM) detected
+        <strong style="color:{% if ml.final_vote==1 %}var(--red){% else %}var(--green){% endif %}">
+          {{ ml.final_label }}
+        </strong>
+        with <strong style="color:var(--text)">{{ ml.avg_prob_pos }}%</strong> Alzheimer probability
+        ({{ ml.vote_count }}/{{ ml.total_models }} models in agreement).
+        {% endif %}
+        {% if cnn %}
+        The MRI CNN classified the scan as
+        <strong style="color:var(--text)">{{ cnn.pred_class }}</strong>
+        with <strong style="color:var(--text)">{{ cnn.confidence }}%</strong> confidence.
+        {% endif %}
+        {% if ml and cnn %}
+        These two signals were combined using a
+        <strong style="color:var(--cyan)">40% Clinical / 60% MRI</strong> weighted fusion,
+        yielding a final combined severity score of
+        <strong style="color:var(--text)">{{ final.severity_score }}/3.0</strong>
+        and an Alzheimer risk of
+        <strong style="color:var(--text)">{{ final.combined_prob }}%</strong>.
+        {% elif ml %}
+        MRI was not provided — result is based on clinical data only.
+        {% elif cnn %}
+        Clinical biomarkers were not provided — result is based on MRI only.
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SIDE-BY-SIDE SUMMARY
+  ══════════════════════════════════════════ -->
+  <div class="row g-3 mb-4">
+
+    <!-- ML Summary -->
+    {% if ml %}
+    <div class="col-md-6">
+      <div class="card-dark h-100">
+        <div class="card-header-dark">
+          <div class="icon-box icon-violet" style="width:30px;height:30px;font-size:12px">
+            <i class="fas fa-table-list"></i>
+          </div>
+          <h6>Clinical ML Summary</h6>
+          <span class="pill {% if ml.final_vote==1 %}pill-red{% else %}pill-green{% endif %} ms-auto"
+                style="font-size:10px">{{ ml.final_label }}</span>
+        </div>
+        <div class="card-body-dark">
+          {% for r in ml.model_results %}
+          <div style="display:flex;justify-content:space-between;align-items:center;
+                      padding:.5rem 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:12px;color:var(--muted)">{{ r.name }}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;font-weight:700;
+                           color:{% if r.prediction==1 %}var(--red){% else %}var(--green){% endif %}">
+                {{ r.label }}
+              </span>
+              <span style="font-size:11px;color:var(--muted2)">{{ r.confidence }}%</span>
+            </div>
+          </div>
+          {% endfor %}
+          <div style="margin-top:.85rem">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span style="color:var(--muted)">Alzheimer Probability</span>
+              <span style="font-weight:700;
+                           color:{% if ml.final_vote==1 %}var(--red){% else %}var(--green){% endif %}">
+                {{ ml.avg_prob_pos }}%
+              </span>
+            </div>
+            <div class="prog-track">
+              <div class="prog-fill {% if ml.final_vote==1 %}prog-red{% else %}prog-green{% endif %}"
+                   style="width:{{ ml.avg_prob_pos }}%"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:8px;color:var(--muted2)">
+              <span>ML Accuracy: <strong style="color:var(--text)">{{ "%.1f"|format(ml.model_results[0].test_acc if ml.model_results else 0) }}%</strong></span>
+              <span>AUC: <strong style="color:var(--text)">{{ "%.1f"|format(ml.model_results[0].auc if ml.model_results else 0) }}%</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- CNN Summary -->
+    {% if cnn %}
+    <div class="col-md-6">
+      <div class="card-dark h-100">
+        <div class="card-header-dark">
+          <div class="icon-box icon-cyan" style="width:30px;height:30px;font-size:12px">
+            <i class="fas fa-brain"></i>
+          </div>
+          <h6>MRI CNN Summary</h6>
+          <span class="pill pill-{% if cnn.badge=='none' %}green{% elif cnn.badge=='low' %}blue{% elif cnn.badge=='medium' %}amber{% else %}red{% endif %} ms-auto"
+                style="font-size:10px">{{ cnn.pred_class }}</span>
+        </div>
+        <div class="card-body-dark">
+          <div class="text-center mb-3">
+            <img src="{{ cnn.img_url }}" alt="MRI"
+                 style="max-height:130px;border-radius:8px;
+                        border:1px solid var(--border);object-fit:contain">
+          </div>
+          {% for item in cnn.all_probs %}
+          <div style="margin-bottom:.65rem">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+              <span style="color:{% if loop.first %}var(--text){% else %}var(--muted){% endif %};
+                           font-weight:{% if loop.first %}700{% else %}400{% endif %}">
+                {{ item.class }}
+              </span>
+              <span style="font-weight:700;color:{{ item.txt_color }}">{{ item.prob }}%</span>
+            </div>
+            <div class="prog-track" style="height:6px">
+              <div class="prog-fill {{ item.bar_color }}" style="width:{{ item.prob }}%;height:6px"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div><!-- /row -->
+
+  <!-- ══════════════════════════════════════════
+       ACTIONS
+  ══════════════════════════════════════════ -->
+  <div class="d-flex gap-2 flex-wrap mb-4">
+    <a href="{{ url_for('combined_form') }}"
+       class="btn-purple d-flex align-items-center gap-2" style="text-decoration:none">
+      <i class="fas fa-redo"></i> New Combined Analysis
+    </a>
+    <a href="{{ url_for('ml_form') }}"
+       class="btn-outline d-flex align-items-center gap-2" style="text-decoration:none">
+      <i class="fas fa-table-list"></i> Clinical Only
+    </a>
+    <a href="{{ url_for('cnn_form') }}"
+       class="btn-green d-flex align-items-center gap-2" style="text-decoration:none">
+      <i class="fas fa-brain"></i> MRI Only
+    </a>
+    <a href="{{ url_for('dashboard') }}"
+       class="btn-ghost d-flex align-items-center gap-2" style="text-decoration:none">
+      <i class="fas fa-chart-bar"></i> Dashboard
+    </a>
+  </div>
+
+  <div class="alert alert-warning d-flex gap-2 align-items-start">
+    <i class="fas fa-triangle-exclamation mt-1" style="flex-shrink:0"></i>
+    <span>
+      <strong>Disclaimer:</strong> This AI-generated combined analysis is for research and
+      educational purposes only. It is NOT a certified medical diagnosis. Always consult a
+      qualified neurologist for clinical evaluation.
+    </span>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Animate all progress bars
+  document.querySelectorAll('.prog-fill').forEach(bar => {
+    const w = bar.style.width; bar.style.width = '0%';
+    setTimeout(() => bar.style.width = w, 150);
+  });
+
+  // Animate fusion marker
+  const pct = {{ final.combined_prob }};
+  setTimeout(() => {
+    document.getElementById('fusionMarker').style.left = Math.min(pct, 97) + '%';
+  }, 300);
+</script>
+{% endblock %}
